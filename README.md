@@ -10,7 +10,7 @@ Ein 3D-gedruckter Halloween-Grabstein für den Vorgarten. Kommt jemand vorbei, f
 |---|---|
 | Raspberry Pi 4 | Steuerung, Raspberry Pi OS Lite 64-bit |
 | Seeed ReSpeaker XVF3800 (USB, ohne XIAO) | Mikrofon-Array mit Echounterdrückung, Audioausgang |
-| Aktivlautsprecher mit Klinke | Ton per Klinke vom ReSpeaker, Strom per USB vom Pi |
+| Passiver Kleinlautsprecher mit PH2.0-Stecker | an der JST-Lautsprecherbuchse des ReSpeakers (Verstärker an Bord) |
 | HC-SR501 | Bewegungsmelder: „jemand kommt“ |
 | HLK-LD2410C | Radar: „jemand bleibt stehen“ |
 | Netzteil USB-C 5 V / 3 A | Strom für den Pi |
@@ -24,7 +24,7 @@ Physische Pin-Nummern der 40-poligen Leiste:
 | Bewegungsmelder HC-SR501 | Pin 2 (5 V) | Pin 11 (GPIO17) | Pin 6 |
 | Radar LD2410C | Pin 4 (5 V) | Pin 15 (GPIO22) | Pin 9 |
 
-Der ReSpeaker hängt per USB am Pi. Der Lautsprecher bekommt den Ton per Klinke vom ReSpeaker und den Strom aus einer freien USB-Buchse am Pi. Die Klinke am Pi bleibt frei. Die Zeichnung von oben liegt in [`software/verkabelung.html`](software/verkabelung.html) (im Browser öffnen).
+Der ReSpeaker hängt per USB am Pi. Der Lautsprecher steckt an der JST-Lautsprecherbuchse des ReSpeakers und bekommt dort Ton und Strom. Die Klinke am Pi bleibt frei. Die Zeichnung von oben liegt in [`software/verkabelung.html`](software/verkabelung.html) (im Browser öffnen).
 
 ## Aufbau des Repos
 
