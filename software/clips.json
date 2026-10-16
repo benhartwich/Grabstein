@@ -1,0 +1,31 @@
+{
+  "approach": [
+    "Psssst … hier unten …",
+    "Wer stört meine Ruhe?",
+    "Ich kann dich hören … komm ein bisschen näher …",
+    "Hihihi … noch einer …",
+    "Hast du das auch gehört?",
+    "Oooh … ein Besucher … wie lange ist das her …",
+    "Nicht weglaufen … ich beiße nicht … meistens.",
+    "Hier ist es so kalt … so kalt …"
+  ],
+  "stay": [
+    "Du bist mutig … das gefällt mir. Weißt du, wie lange ich schon hier liege? Hundert Jahre … und einen Tag.",
+    "Bleib ruhig stehen … ich will dich nur ansehen. Hmmm … du hast schöne Schuhe.",
+    "Ich verrate dir ein Geheimnis: Unter jedem Kürbis wohnt ein kleiner Geist. Pass gut auf deinen auf.",
+    "Wenn du dreimal leise Buh flüsterst, darfst du dir ein Zuckerl nehmen. Ich hab's nicht gesehen …",
+    "Früher war hier ein Garten. Jetzt bin ich hier. Und die Spinne. Sag Hallo zur Spinne."
+  ],
+  "leave": [
+    "Ich muss zurück in mein Grab … die Spinne wartet. Fröhliches Halloween!",
+    "Huuuh … ich werde müde. Komm wieder … nächstes Jahr …",
+    "Genug geredet. Geh zu den anderen Häusern … aber schau dich nicht um …"
+  ],
+  "gentle": [
+    "Hallo … ich bin der kleine Grabsteingeist. Fröhliches Halloween!",
+    "Huuuh … hab ich dich erschreckt? Ich bin ganz lieb, versprochen.",
+    "Was für ein tolles Kostüm! Da muss ja sogar ein Geist staunen.",
+    "Psst … nimm dir ruhig ein Zuckerl. Ich esse eh keine.",
+    "Die Spinne im Netz heißt Gustav. Sie winkt dir zu!"
+  ]
+}
