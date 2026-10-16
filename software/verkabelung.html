@@ -81,7 +81,7 @@ td.mono { font-family: var(--font-mono); white-space: nowrap; }
   <header>
     <span class="eyebrow">Flüsternder Grabstein · Raspberry Pi 4</span>
     <h1>Verkabelung von oben</h1>
-    <p class="lead">Sechs Jumperkabel zu den Sensoren, ein USB-Kabel zum ReSpeaker, der Lautsprecher hängt am ReSpeaker. Die Zahlen in den farbigen Punkten sind die Pin-Nummern auf der GPIO-Leiste.</p>
+    <p class="lead">Sechs Jumperkabel zu den Sensoren, ein USB-Kabel zum ReSpeaker. Der Lautsprecher bekommt den Ton per Klinke vom ReSpeaker und den Strom per USB vom Pi. Die Zahlen in den farbigen Punkten sind die Pin-Nummern auf der GPIO-Leiste.</p>
   </header>
 
   <section class="panel diagram" aria-label="Schaltbild">
@@ -212,12 +212,14 @@ td.mono { font-family: var(--font-mono); white-space: nowrap; }
 <circle cx="960" cy="645" r="27" style="fill:none; stroke: var(--ink); stroke-width: 1.5"/>
 <circle cx="960" cy="645" r="9" style="fill: var(--ink)"/>
 <text x="960" y="712" text-anchor="middle" class="t-ink">Lautsprecher</text>
-<path d="M1016 379 V600" style="fill:none; stroke: var(--w-usb); stroke-width: 3"/>
-<path d="M945 408 V600" style="fill:none; stroke: var(--w-usb); stroke-width: 3; stroke-dasharray: 6 5"/>
-<text x="960" y="730" text-anchor="middle" class="t-muted">an JST, oder Klinke (gestrichelt)</text>
+<text x="960" y="730" text-anchor="middle" class="t-muted">aktiv, USB-Strom</text>
+<path d="M945 408 V600" style="fill:none; stroke: var(--w-usb); stroke-width: 3"/>
+<text x="953" y="505" transform="rotate(-90 953 505)" text-anchor="middle" class="t-muted" dy="10">Klinkenkabel (Ton)</text>
+<path d="M840 576 H880 V660 H900" style="fill:none; stroke: var(--w-5v); stroke-width: 3.5; stroke-linejoin: round"/>
+<text x="872" y="618" transform="rotate(-90 872 618)" text-anchor="middle" class="t-muted">USB (Strom)</text>
 </svg>
     <div class="legend">
-      <span><i class="sw" style="background: var(--w-5v)"></i>5 V</span>
+      <span><i class="sw" style="background: var(--w-5v)"></i>5 V / Strom</span>
       <span><i class="sw" style="background: var(--w-gnd)"></i>GND (Masse)</span>
       <span><i class="sw" style="background: var(--w-pir)"></i>Signal Bewegungsmelder</span>
       <span><i class="sw" style="background: var(--w-radar)"></i>Signal Radar</span>
@@ -239,7 +241,8 @@ td.mono { font-family: var(--font-mono); white-space: nowrap; }
           <tr><td>Radar LD2410C</td><td class="mono">GND</td><td class="mono">Pin 9 · GND</td><td><i class="dot" style="background: var(--w-gnd)"></i>schwarz</td></tr>
           <tr><td>Radar LD2410C</td><td class="mono">TX, RX</td><td>frei lassen</td><td>–</td></tr>
           <tr><td>ReSpeaker</td><td class="mono">USB-C</td><td>USB-A am Pi (beliebige Buchse)</td><td>USB-Kabel</td></tr>
-          <tr><td>Lautsprecher</td><td class="mono">JST oder Klinke</td><td>am ReSpeaker</td><td>–</td></tr>
+          <tr><td>Lautsprecher</td><td class="mono">Klinke (Ton)</td><td>Klinkenbuchse am ReSpeaker, nicht am Pi</td><td>Klinkenkabel</td></tr>
+          <tr><td>Lautsprecher</td><td class="mono">USB (Strom)</td><td>freie USB-A-Buchse am Pi</td><td>USB-Kabel des Lautsprechers</td></tr>
           <tr><td>Netzteil</td><td class="mono">USB-C</td><td>Strombuchse am Pi</td><td>5 V / 3 A</td></tr>
         </tbody>
       </table>
@@ -254,6 +257,8 @@ td.mono { font-family: var(--font-mono); white-space: nowrap; }
         <li><strong>Beschriftung auf den Sensoren lesen:</strong> Die Pin-Reihenfolge ist nicht bei allen Exemplaren gleich. Beim HC-SR501 stehen VCC, OUT und GND unter der abziehbaren Linse, beim Radar neben den Lötpunkten. Es zählt der Aufdruck, nicht die Position im Bild.</li>
         <li><strong>5 V nie an OUT:</strong> Ein vertauschtes Kabel an einem GPIO-Pin kann den Pi beschädigen. Vor dem Einschalten jede Leitung einmal mit der Tabelle vergleichen.</li>
         <li><strong>Ton immer über den ReSpeaker:</strong> Die Klinke am Pi bleibt frei. Nur so funktioniert die Echounterdrückung.</li>
+        <li><strong>Brummt oder fiept der Lautsprecher,</strong> liegt das meist an der gemeinsamen Masse von USB-Strom und Klinke. Dann hilft ein Massetrennfilter (Ground Loop Isolator) im Klinkenkabel oder ein eigenes USB-Netzteil für den Lautsprecher.</li>
+        <li><strong>JST-Buchse am ReSpeaker</strong> ist nur für passive Lautsprecher ohne eigenen Strom gedacht. Bei deinem Aktivlautsprecher bleibt sie frei.</li>
       </ol>
     </div>
     <div class="panel">

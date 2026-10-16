@@ -7,7 +7,7 @@
 | Bewegungsmelder HC-SR501 | VCC / OUT / GND | 2 (5 V) / 11 (GPIO17) / 6 |
 | Radar LD2410C | VCC / OUT / GND | 4 (5 V) / 15 (GPIO22) / 9 |
 | ReSpeaker XVF3800 | USB-C → USB-A am Pi | – |
-| Lautsprecher | an den ReSpeaker (JST oder Klinke) | – |
+| Lautsprecher (aktiv) | Klinke → Klinkenbuchse am ReSpeaker, USB → freie USB-Buchse am Pi (nur Strom) | – |
 
 Andere Pins? In `/etc/grabstein/grabstein.env` bei `PIR_PIN` und `RADAR_PIN` die GPIO-Nummer eintragen.
 
