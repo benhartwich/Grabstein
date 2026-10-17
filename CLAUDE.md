@@ -45,7 +45,7 @@ Hauptschleife alle 0,1 s; Web-Befehle laufen über eine Queue in die Schleife. L
 
 ## Offene Aufgaben
 
-1. **Nächste Schritte (nacheinander):** Gespräch nach 15 s Stille beenden → Musik (Spotify Connect, Web-Stream-URL, eigene/erzeugte Tracks; dmix, Aus-/Einblenden) → Katzenschwelle über Radar-Stärke. Erledigt: Radar-Abstand, Gesprächsabstand `near_cm` (150) mit Lockruf-Gruppe „lure“.
+1. **Nächste Schritte (nacheinander):** Musik (Spotify Connect, Web-Stream-URL, eigene/erzeugte Tracks; dmix, Aus-/Einblenden) → Katzenschwelle über Radar-Stärke. Erledigt: Radar-Abstand, Gesprächsabstand `near_cm` (150) mit Lockruf-Gruppe „lure“, Auflegen nach 15 s Stille (`silence_end_call_timeout`).
 2. **LED-Streifen** (WS2812, SPI Pin 19, 5 V über Y-Verteiler an Pin 4, GND Pin 14) – Teile bestellt?
 3. **Test:** sanftes Gesprächsende (ZEIT UM nach 90 s), Audio-Tags statt „kicher“, keine Selbst-Unterbrechung mehr.
 4. **Optional Latenz:** Signed-URL vorab holen (erste Antwort ~1,2–1,7 s).
