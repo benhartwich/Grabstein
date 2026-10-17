@@ -76,6 +76,11 @@ def status(h, app: g.Grabstein):
             "radar": None if not sen or sen.radar is None else bool(sen.radar.value),
             "radar_s": round(mono - sen.radar_since, 1) if sen and sen.radar_since else 0,
             "motion_ago": round(mono - sen.last_motion) if sen and sen.last_motion else None,
+            "distance": None if not sen or not sen.data.fresh() else {
+                "state": sen.data.state, "cm": sen.data.dist_cm,
+                "move_cm": sen.data.move_cm, "move_energy": sen.data.move_energy,
+                "still_cm": sen.data.still_cm, "still_energy": sen.data.still_energy,
+            },
         },
         "talk": None if talk is None else {
             "elapsed": round(talk.elapsed()), "max": s["talk_max_s"], "mode": talk.mode,

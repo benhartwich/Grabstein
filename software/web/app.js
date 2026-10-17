@@ -248,6 +248,22 @@ VIEWS.start = {
     $("#act-talk").disabled = !!st.talk || !st.agent || !st.online;
     $("#say-btn").disabled = !st.tts;
   },
+  distance(d) {
+    // Abstand auf einer Skala bis 6 m, darunter die Signalstärke von bewegtem und ruhendem Ziel
+    const pos = (cm) => Math.min(100, (cm / 600) * 100);
+    const who = d.state === 0 ? "niemand" : d.state === 1 ? "bewegt sich" : d.state === 2 ? "steht still" : "bewegt sich und steht";
+    const near = d.state && d.cm <= 150;
+    return `<div class="radar">
+      <div class="radar-head"><span>Abstand</span><b>${d.state ? `${(d.cm / 100).toLocaleString("de-AT", { maximumFractionDigits: 1 })} m` : "–"}</b><span class="muted">${who}</span></div>
+      <div class="radar-scale">
+        <i class="zone" style="width:${pos(150)}%"></i>
+        ${d.state ? `<i class="dot ${near ? "near" : ""}" style="left:${pos(d.cm)}%"></i>` : ""}
+      </div>
+      <div class="radar-ticks"><span>0</span><span style="left:${pos(150)}%">1,5 m</span><span style="left:${pos(300)}%">3</span><span style="left:${pos(450)}%">4,5</span><span style="right:0">6 m</span></div>
+      <div class="energy"><span>Bewegung</span><div class="progress"><i style="width:${d.move_energy}%"></i></div><b>${d.move_energy}</b></div>
+      <div class="energy"><span>Ruhend</span><div class="progress"><i style="width:${d.still_energy}%"></i></div><b>${d.still_energy}</b></div>
+    </div>`;
+  },
   renderLive(st) {
     const live = $("#live");
     if (st.talk) {
@@ -270,6 +286,7 @@ VIEWS.start = {
         ${sensor(sen.pir, "Bewegung", sen.pir === null ? "nicht angeschlossen" : sen.pir ? "erkannt" : `zuletzt ${ago(sen.motion_ago)}`)}
         ${sensor(sen.radar, "Radar", sen.radar === null ? "nicht angeschlossen" : sen.radar ? `jemand da · ${Math.round(sen.radar_s)} s` : "frei")}
       </div>
+      ${sen.distance ? this.distance(sen.distance) : ""}
       ${st.playing ? `<div class="nowplaying"><span class="eq"><i></i><i></i><i></i></span>Spielt: ${esc(st.playing)}</div>` : ""}`;
   },
 };

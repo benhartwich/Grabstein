@@ -14,7 +14,7 @@ Halloween-Deko von Benjamin: 3D-gedruckter Grabstein (Snapmaker U1) mit Raspberr
 
 - Raspberry Pi 4, Raspberry Pi OS Lite 64-bit (Trixie), Hostname `grabstein`, User `ben`
 - Bewegungsmelder HC-SR501: VCC Pin 2, OUT Pin 11 (GPIO17), GND Pin 6
-- Radar HLK-LD2410C: VCC Pin 4, OUT Pin 15 (GPIO22), GND Pin 9, TX/RX frei
+- Radar HLK-LD2410C: VCC Pin 4, OUT Pin 15 (GPIO22), GND Pin 9, RX → Pin 8, TX → Pin 10 (UART /dev/serial0, 256000 Baud, Abstand + Stärke ~10×/s; Bluetooth dafür aus)
 - ReSpeaker XVF3800 (USB, ohne XIAO): USB-C an USB-A des Pi, ALSA-Karte `Array`
 - Lautsprecher: **passiv**, Kleinlautsprecher mit PH2.0-Stecker an der JST-Lautsprecherbuchse des ReSpeakers (Verstärker an Bord). Kein eigener Strom, keine Klinke. Klinke am ReSpeaker nur für Kopfhörer-Tests, Klinke am Pi nie benutzen.
 - Zeichnung: `software/verkabelung.html`
@@ -45,8 +45,8 @@ Hauptschleife alle 0,1 s; Web-Befehle laufen über eine Queue in die Schleife. L
 
 ## Offene Aufgaben
 
-1. **Radar-Gegenprobe:** Raum leer → muss auf „frei“ fallen (bisher nur mit Person im Raum gesehen, Dauer-„da“).
-2. **LED-Ring des ReSpeakers:** blinkt dauernd (DoA-Anzeige). Über Seeeds `xvf_host` abschalten bzw. nur im Gespräch leuchten lassen.
+1. **Radar:** Gegenprobe ok (fällt nach ~10 s auf „niemand“). Abstand per UART läuft. Nächste Schritte: flüstern erst ab 1,5 m, Katzenschwelle über Stärke, Gespräch nach 15 s Stille beenden, Musik (Spotify Connect + eigene/erzeugte Tracks, dmix).
+2. **LED-Streifen** (WS2812, SPI Pin 19, 5 V über Y-Verteiler an Pin 4, GND Pin 14) – Teile bestellt?
 3. **Test:** sanftes Gesprächsende (ZEIT UM nach 90 s), Audio-Tags statt „kicher“, keine Selbst-Unterbrechung mehr.
 4. **Optional Latenz:** Signed-URL vorab holen (erste Antwort ~1,2–1,7 s).
 

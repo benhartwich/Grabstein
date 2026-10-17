@@ -33,7 +33,7 @@ sudo mkdir -p /var/lib/grabstein && sudo chown "$ME:$ME" /var/lib/grabstein
 say "3/6 Python-Umgebung mit ElevenLabs-SDK"
 python3 -m venv --system-site-packages "$DEST/venv"
 "$DEST/venv/bin/pip" install -q --upgrade pip
-"$DEST/venv/bin/pip" install -q "elevenlabs==2.73.0" "pyusb==1.3.1"
+"$DEST/venv/bin/pip" install -q "elevenlabs==2.73.0" "pyusb==1.3.1" "pyserial==3.5"
 "$DEST/venv/bin/python" -c "import gpiozero, pyaudio, elevenlabs; print('Python-Module ok')"
 
 say "4/6 ReSpeaker als Standard-Audiogerät einrichten"

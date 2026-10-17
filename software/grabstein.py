@@ -918,8 +918,61 @@ def push_agent(prompt: str, first: str, talk_max_s: int) -> tuple[str, str]:
 
 
 # ---------------------------------------------------------------- Sensoren
+class RadarData:
+    """Liest die Datenpakete des LD2410C über die serielle Schnittstelle (Pin 8/10, 256000 Baud):
+    Abstand und Signalstärke des bewegten bzw. ruhenden Ziels, etwa zehnmal pro Sekunde."""
+    PORT = "/dev/serial0"
+    HEAD, TAIL = b"\xf4\xf3\xf2\xf1", b"\xf8\xf7\xf6\xf5"
+
+    def __init__(self) -> None:
+        self.state = 0                     # 0 niemand, 1 bewegt, 2 steht, 3 beides
+        self.move_cm = self.move_energy = self.still_cm = self.still_energy = self.dist_cm = 0
+        self.updated: float | None = None  # monotonic der letzten Messung
+        try:
+            import serial
+            self.port = serial.Serial(self.PORT, 256000, timeout=0.5)
+        except Exception as e:  # noqa: BLE001 – ohne Abstand läuft alles über den OUT-Pin weiter
+            log(f"Radar-Daten nicht lesbar ({e}) – nur Ja/Nein über den OUT-Pin")
+            self.port = None
+            return
+        threading.Thread(target=self._read, daemon=True, name="radar").start()
+
+    def fresh(self) -> bool:
+        return self.updated is not None and time.monotonic() - self.updated < 2
+
+    def _read(self) -> None:
+        import struct
+        buf = b""
+        while True:
+            try:
+                buf += self.port.read(256)
+            except Exception as e:  # noqa: BLE001
+                log(f"Radar-Daten abgebrochen: {e}")
+                return
+            while True:
+                i = buf.find(self.HEAD)
+                if i < 0:
+                    buf = buf[-3:]
+                    break
+                if len(buf) < i + 6:
+                    break
+                n = struct.unpack_from("<H", buf, i + 4)[0]
+                if n > 64:  # kein gültiges Paket – Kopf weiter hinten suchen
+                    buf = buf[i + 4:]
+                    continue
+                if len(buf) < i + 10 + n:
+                    break
+                d, buf = buf[i + 6:i + 6 + n], buf[i + 10 + n:]
+                if len(d) >= 13 and d[1] == 0xAA:  # Grunddaten
+                    self.state = d[2]
+                    (self.move_cm, self.move_energy, self.still_cm,
+                     self.still_energy, self.dist_cm) = struct.unpack_from("<HBHBH", d, 3)
+                    self.updated = time.monotonic()
+
+
 class Sensors:
     def __init__(self) -> None:
+        self.data = RadarData()
         self.pir = self._input(CFG["pir_pin"], "Bewegungsmelder")
         self.radar = self._input(CFG["radar_pin"], "Radar")
         self._motion = threading.Event()
