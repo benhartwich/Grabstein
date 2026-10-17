@@ -10,6 +10,7 @@ const MODE = {
   off: { label: "Schläft", short: "Aus" },
   gentle: { label: "Lieb", short: "Lieb" },
   full: { label: "Gruselig", short: "Gruselig" },
+  music: { label: "Nur Musik", short: "Musik" },
   auto: { label: "Automatik", short: "Automatik" },
 };
 const GROUP = {
@@ -135,7 +136,7 @@ VIEWS.start = {
           <div class="card">
             <div class="card-head"><h2>Betriebsart</h2><span class="muted" id="op-hint"></span></div>
             <div class="seg" id="op-seg">
-              ${["auto", "off", "gentle", "full"].map((m) => `<button type="button" data-mode="${m}">${MODE[m].short}</button>`).join("")}
+              ${["auto", "off", "music", "gentle", "full"].map((m) => `<button type="button" data-mode="${m}">${MODE[m].short}</button>`).join("")}
             </div>
             <div class="chips" id="op-dur">
               ${DURATIONS.map((d) => `<button type="button" class="chip" data-dur="${d.key}">${d.label}</button>`).join("")}
@@ -307,12 +308,12 @@ VIEWS.zeitplan = {
     v.innerHTML = `
       <div class="card">
         <div class="card-head"><h2>Nächste 7 Tage</h2>
-          <div class="legend"><span><i style="background:var(--gentle)"></i>Lieb</span><span><i style="background:var(--full)"></i>Gruselig</span></div>
+          <div class="legend"><span><i style="background:var(--gentle)"></i>Lieb</span><span><i style="background:var(--full)"></i>Gruselig</span><span><i style="background:var(--accent)"></i>Nur Musik</span></div>
         </div>
         <div class="ticks"><div></div><div>${[12, 15, 18, 21, 0, 3, 6].map((h, i) => `<span style="left:${(i * 3 * 60 / 1080) * 100}%">${h}</span>`).join("")}</div></div>
         <div class="week" id="week"></div>
       </div>
-      <p class="intro">Einträge für Wochentage gelten jede Woche. Ein Eintrag mit <b>Datum</b> ersetzt an diesem Tag alle Wochentags-Einträge – praktisch für Halloween. Überschneiden sich Einträge, gewinnt „Aus“, dann „Gruselig“. Über Mitternacht geht: einfach z. B. 20:00 bis 01:00.</p>
+      <p class="intro">„Musik“ heißt: nur Hintergrundmusik, Gustav reagiert nicht. Einträge für Wochentage gelten jede Woche. Ein Eintrag mit <b>Datum</b> ersetzt an diesem Tag alle Wochentags-Einträge – praktisch für Halloween. Überschneiden sich Einträge, gewinnt „Aus“, dann „Gruselig“. Über Mitternacht geht: einfach z. B. 20:00 bis 01:00.</p>
       <div class="stack" id="entries"></div>
       <div class="btn-row">
         <button class="btn" id="add-week">${icon("plus")}Wochentage</button>
@@ -353,7 +354,7 @@ VIEWS.zeitplan = {
       <div class="entry ${e.mode}" data-i="${i}">
         <div class="entry-top">
           <div class="seg small" data-k="mode">
-            ${["gentle", "full", "off"].map((m) => `<button type="button" data-mode="${m}" class="${e.mode === m ? "active" : ""}">${MODE[m].short}</button>`).join("")}
+            ${["gentle", "full", "music", "off"].map((m) => `<button type="button" data-mode="${m}" class="${e.mode === m ? "active" : ""}">${MODE[m].short}</button>`).join("")}
           </div>
           <button class="icon-btn" data-k="del" aria-label="Eintrag löschen">${icon("trash")}</button>
         </div>

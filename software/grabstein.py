@@ -72,7 +72,7 @@ CFG = {
 }
 GROUPS = ("approach", "lure", "stay", "leave", "gentle")
 LURE_PAUSE_S = 20  # Abstand zwischen zwei Lockrufen, wenn jemand zu weit weg stehen bleibt
-MODES = ("off", "gentle", "full")
+MODES = ("off", "gentle", "full", "music")  # music = nur Hintergrundmusik, Sensoren ruhen
 LOG: deque[tuple[float, str]] = deque(maxlen=500)
 
 
@@ -280,11 +280,11 @@ def _entry_days(e: dict, now: datetime) -> list[date]:
 
 def schedule_mode(now: datetime, schedule: list[dict]) -> str:
     """Datums-Einträge ersetzen an ihrem Tag die Wochentags-Einträge.
-    Überschneiden sich Einträge, gewinnt „aus“, dann „gruselig“, dann „lieb“."""
+    Überschneiden sich Einträge, gewinnt „aus“, dann „gruselig“, dann „lieb“, dann „nur Musik“."""
     dated = {e["date"] for e in schedule if e["date"]}
     hits = {e["mode"] for e in schedule for d in _entry_days(e, now)
             if e["date"] or d.isoformat() not in dated}
-    return next((m for m in ("off", "full", "gentle") if m in hits), "off")
+    return next((m for m in ("off", "full", "gentle", "music") if m in hits), "off")
 
 
 def current_mode(now: datetime, trusted: bool, s: dict) -> tuple[str, str]:
@@ -1419,13 +1419,13 @@ class Grabstein:
                     talk.wrap_up("Zeitlimit")
                 elif self.state.left(now, s["talk_budget_min"]) - talk.elapsed() <= 0:
                     talk.wrap_up("Budget aufgebraucht")
-                elif mode == "off" and not talk.manual:
+                elif mode in ("off", "music") and not talk.manual:
                     reason = "Ende der Aktivzeit"
                 if reason:
                     self._end_talk(reason)
                 continue
 
-            if mode == "off" or self.player.playing():
+            if mode in ("off", "music") or self.player.playing():
                 continue
 
             # --- jemand bleibt stehen, aber zu weit weg: anlocken
