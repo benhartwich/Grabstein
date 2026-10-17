@@ -46,7 +46,7 @@ Hauptschleife alle 0,1 s; Web-Befehle laufen über eine Queue in die Schleife. L
 ## Offene Aufgaben
 
 1. **Mikrofon-Pegel prüfen:** Aufnahme läuft seit dem Stille-Fix, Pegel aber niedrig (Spitze ~850). Mit Transkript-Anzeige ein echtes Gespräch testen; ggf. Verstärkung per `xvf_host` (AGC) anheben.
-2. **Sensoren verkabeln** und unter „Start → Live“ prüfen; danach `Stehenbleiben ab`/`Weg nach` einstellen.
+2. **Sensoren:** verkabelt und geprüft (siehe `software/verkabelung.html`, Fotos in `docs/`). Bewegungsmelder schaltet; Radar mit leerem Raum gegenprüfen, dann `Stehenbleiben ab`/`Weg nach` einstellen. Radar-Pins (Bauteilseite): VCC grau, GND weiß, OUT schwarz.
 3. **Optional Latenz weiter senken:** Signed-URL vorab holen und kurz cachen (erste Antwort derzeit 1,6 s).
 
 Erledigt (17.10.): GitHub (`benhartwich/Grabstein`), lgpio-Arbeitsverzeichnis, Lautsprecher an JST ohne Verstärker-Enable, `LAUTSTAERKE=100`, Web-Oberfläche, hängendes Gesprächsende (PortAudio) und taubes Mikrofon (SYNC-Kopplung) behoben, Wrapper startet Dienst nach Tests neu.
