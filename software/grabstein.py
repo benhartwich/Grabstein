@@ -66,7 +66,7 @@ CFG = {
     "cooldown_talk_s": env_int("PAUSE_GESPRAECH_SEKUNDEN", 120),
     "talk_max_s": env_int("GESPRAECH_MAX_SEKUNDEN", 90),
     "talk_budget_min": env_int("GESPRAECH_BUDGET_MINUTEN", 20),
-    "volume": env_int("LAUTSTAERKE", 75),
+    "volume": env_int("LAUTSTAERKE", 100),
     "live_agent": env("LIVE_AGENT", "1") == "1",
     "agent_id": env("ELEVENLABS_AGENT_ID", ""),
     "api_key": env("ELEVENLABS_API_KEY", ""),
@@ -149,13 +149,19 @@ class Budget:
 
 # ---------------------------------------------------------------- Audio
 def set_volume(percent: int) -> None:
-    """Setzt alle Wiedergaberegler der Standard-Soundkarte (ReSpeaker)."""
+    """Setzt alle Wiedergaberegler der Standard-Soundkarte (ReSpeaker).
+
+    Nur Regler mit pvolume (der Mikrofonregler „Headset“ bleibt unberührt),
+    mit Index, weil der ReSpeaker zwei „PCM“-Regler hat."""
     try:
-        out = subprocess.run(["amixer", "scontrols"], capture_output=True, text=True, timeout=3).stdout
+        out = subprocess.run(["amixer", "scontents"], capture_output=True, text=True, timeout=3).stdout
+        control = None
         for line in out.splitlines():
-            if "'" in line:
-                name = line.split("'")[1]
-                subprocess.run(["amixer", "-q", "sset", name, f"{percent}%", "unmute"],
+            if line.startswith("Simple mixer control"):
+                name, index = line.split("'")[1], line.rsplit(",", 1)[1]
+                control = f"{name},{index}"
+            elif control and "Capabilities:" in line and "pvolume" in line.split():
+                subprocess.run(["amixer", "-q", "sset", control, f"{percent}%", "unmute"],
                                capture_output=True, timeout=3)
     except (OSError, subprocess.SubprocessError) as e:
         log(f"Lautstärke nicht gesetzt: {e}")

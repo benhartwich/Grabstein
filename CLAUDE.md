@@ -42,10 +42,10 @@ Hauptschleife alle 0,1 s. Laufende Clips werden nie unterbrochen, Auslösungen w
 
 ## Offene Aufgaben (der Reihe nach)
 
-1. **GitHub:** Leeres privates Repo `benhartwich/grabstein` existiert schon. `gh` installieren (`sudo apt install -y gh`), `gh auth login` (Device-Login – Benjamin bestätigt den Code am Handy), dann `git remote add origin` und `git push -u origin main`.
-2. **Neue `software/grabstein.py` ausrollen:** Sie lädt das SDK beim Dienststart vor und loggt „Erste Antwort nach X s“. `sudo cp software/grabstein.py /opt/grabstein/ && sudo systemctl restart grabstein`, dann `grabstein reden` testen. Vorher war die Wartezeit ca. 3 s (Python-/SDK-Import, Signed-URL, Websocket, erste TTS).
-3. **Lautsprecher an der JST-Buchse testen:** `grabstein ton`. Kopfhörer an der ReSpeaker-Klinke gingen schon. Bleibt der Lautsprecher stumm: Seeed listet einen Verstärker-Enable (XVF3800 GPIO X0D31, low = an) – Seeed-Wiki und `xvf_host`-Tool recherchieren und das Einschalten ins Programm bzw. `install.sh` einbauen.
-4. **Lautstärke einpendeln:** `alsamixer -c Array` bzw. `amixer -c Array scontrols`; Ergebnis als `LAUTSTAERKE=` in die env-Datei. Kleine Lautsprecher klirren ab ~85 %.
-5. **Optional Latenz weiter senken:** Signed-URL vorab holen und kurz cachen.
+1. **`grabstein reden` hängt bei Strg+C** (und bei SIGINT/SIGTERM) – Gespräch sauber beenden.
+2. **Wrapper `/usr/local/bin/grabstein`** startet den Dienst nach Tests nicht wieder – per `trap` neu starten. Außerdem hängt `grabstein ton` nach dem Testton (Aufnahme-Schritt prüfen).
+3. **Optional Latenz weiter senken:** Signed-URL vorab holen und kurz cachen (erste Antwort derzeit 1,6 s).
+
+Erledigt (17.10.): GitHub (`benhartwich/Grabstein`), neue grabstein.py ausgerollt (lgpio braucht beschreibbares Arbeitsverzeichnis → `/run/grabstein` in der Unit), Lautsprecher an JST-Buchse läuft ohne Verstärker-Enable, `LAUTSTAERKE=100` (0 dB, Stimme passt, klirrt nicht).
 
 Nach jeder Änderung: committen und pushen.
