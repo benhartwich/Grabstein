@@ -100,6 +100,10 @@ User=$ME
 Group=$ME
 SupplementaryGroups=gpio audio
 EnvironmentFile=$ETC/grabstein.env
+# lgpio legt Hilfsdateien im Arbeitsverzeichnis an; / ist nicht beschreibbar
+RuntimeDirectory=grabstein
+WorkingDirectory=/run/grabstein
+Environment=LG_WD=/run/grabstein
 ExecStart=$DEST/venv/bin/python $DEST/grabstein.py run
 Restart=always
 RestartSec=5
