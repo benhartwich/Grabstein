@@ -613,6 +613,11 @@ def synthesize(text: str):
             output_format="mp3_44100_128"))
 
 
+WRAP_UP = ("ZEIT UM: Antworte noch kurz auf das, was der Besuch gerade gesagt hat, verabschiede dich "
+           "dann in einem Satz und beende das Gespräch sofort mit dem Werkzeug end_call.")
+WRAP_GRACE_S = 30  # so lange darf die Verabschiedung dauern, dann wird hart beendet
+
+
 class Talk:
     """Ein Gespräch mit dem ElevenLabs-Agenten über Mikrofon und Lautsprecher des ReSpeaker."""
 
@@ -632,6 +637,7 @@ class Talk:
             FMT = ["-q", "-t", "raw", "-f", "S16_LE", "-r", "16000", "-c", "1"]
 
             def __init__(inner) -> None:  # noqa: N805
+                inner.drain = True  # beim Auflegen durch Gustav erst fertig sprechen lassen
                 inner.first = True
                 inner.out: queue.Queue[bytes] = queue.Queue()
                 inner.stopped = threading.Event()
@@ -690,11 +696,21 @@ class Talk:
                     pass
 
             def stop(inner) -> None:  # noqa: N805
+                if inner.drain and inner.procs:
+                    end = time.monotonic() + 8  # Verabschiedung noch ausspielen
+                    while not inner.out.empty() and time.monotonic() < end:
+                        time.sleep(0.05)
+                    time.sleep(0.4)  # Rest im aplay-Puffer
                 with inner.lock:
                     if inner.stopped.is_set():
                         return
                     inner.stopped.set()
                 for p in inner.procs:
+                    if p.stdin:
+                        try:
+                            p.stdin.close()
+                        except OSError:
+                            pass  # Leitung schon zu
                     p.kill()
                     try:
                         p.wait(timeout=1)
@@ -704,6 +720,9 @@ class Talk:
         self.ended = threading.Event()
         self.mode = mode
         self.manual = False
+        self.wrap_since: float | None = None
+        self.wrap_reason = ""
+        self.audio = PipeAudio()
         self.started = talk_started = time.monotonic()
         key = CFG["api_key"] or None
         client = ElevenLabs(api_key=key)
@@ -712,7 +731,7 @@ class Talk:
             client,
             CFG["agent_id"],
             requires_auth=bool(key),
-            audio_interface=PipeAudio(),
+            audio_interface=self.audio,
             config=ConversationInitiationData(dynamic_variables={"modus": mode}),
             callback_agent_response=lambda t: say("Gustav", t),
             callback_user_transcript=lambda t: say("Besuch", t),
@@ -726,7 +745,20 @@ class Talk:
     def elapsed(self) -> float:
         return time.monotonic() - self.started
 
+    def wrap_up(self, reason: str) -> None:
+        """Gustav bittet, sich zu verabschieden und selbst aufzulegen – statt mitten im Satz abzubrechen."""
+        if self.wrap_since is not None:
+            return
+        self.wrap_since, self.wrap_reason = time.monotonic(), reason
+        log(f"{reason} – Gustav verabschiedet sich")
+        try:
+            self.conv.send_contextual_update(WRAP_UP)
+        except Exception as e:  # noqa: BLE001
+            log(f"Abschiedshinweis nicht gesendet: {e}")
+
     def stop(self) -> None:
+        """Sofort beenden (von Hand, Zeitüberschreitung, niemand mehr da)."""
+        self.audio.drain = False
         if not self.ended.is_set():
             t = threading.Thread(target=self._end, daemon=True)
             t.start()
@@ -798,7 +830,7 @@ def push_agent(prompt: str, first: str, talk_max_s: int) -> tuple[str, str]:
             },
         },
         "tts": {"voice_id": CFG["voice_id"], "model_id": CFG["agent_model"]},
-        "conversation": {"max_duration_seconds": talk_max_s},
+        "conversation": {"max_duration_seconds": talk_max_s + WRAP_GRACE_S + 15},
     })
     privacy = AgentPlatformSettingsRequestModel.model_validate(
         {"privacy": {"record_voice": False, "retention_days": 1}})
@@ -970,7 +1002,7 @@ class Grabstein:
         self.talk.stop()
         self.state.add(datetime.now(), "talk_s", self.talk.elapsed())
         self.talk = None
-        if reason in ("Zeitlimit", "Budget aufgebraucht"):
+        if reason.startswith(("Zeitlimit", "Budget")):  # Gustav hat sich nicht selbst verabschiedet
             time.sleep(0.5)
             self.player.play("leave")
         self.next_talk = mono + s["cooldown_talk_s"]
@@ -1031,13 +1063,15 @@ class Grabstein:
             if self.talk is not None:
                 talk, reason = self.talk, ""
                 if talk.ended.is_set():
-                    reason = "Agent hat aufgelegt"
-                elif talk.elapsed() > s["talk_max_s"]:
-                    reason = "Zeitlimit"
+                    reason = "Gustav hat sich verabschiedet" if talk.wrap_since else "Agent hat aufgelegt"
+                elif talk.wrap_since is not None and mono - talk.wrap_since > WRAP_GRACE_S:
+                    reason = f"{talk.wrap_reason} (Verabschiedung zu lang)"
                 elif not talk.manual and sensors.gone(s["leave_s"]):
                     reason = "niemand mehr da"
+                elif talk.elapsed() > s["talk_max_s"]:
+                    talk.wrap_up("Zeitlimit")
                 elif self.state.left(now, s["talk_budget_min"]) - talk.elapsed() <= 0:
-                    reason = "Budget aufgebraucht"
+                    talk.wrap_up("Budget aufgebraucht")
                 elif mode == "off" and not talk.manual:
                     reason = "Ende der Aktivzeit"
                 if reason:
@@ -1127,7 +1161,9 @@ def cmd_reden() -> None:
     t.start()
     print(f"Gespräch läuft höchstens {s['talk_max_s']} s (Strg+C beendet) …")
     try:
-        while not t.ended.is_set() and t.elapsed() < s["talk_max_s"]:
+        while not t.ended.is_set() and t.elapsed() < s["talk_max_s"] + WRAP_GRACE_S:
+            if t.elapsed() > s["talk_max_s"]:
+                t.wrap_up("Zeitlimit")
             time.sleep(0.2)
     except KeyboardInterrupt:
         pass
