@@ -79,8 +79,7 @@ sudo chown "$ME:$ME" "$ETC/grabstein.env"
 sudo chmod 600 "$ETC/grabstein.env"
 sudo usermod -aG gpio,audio "$ME" || true
 # LED-Ring des ReSpeakers per USB steuern (Gruppe audio)
-echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="2886", ATTR{idProduct}=="001a", MODE="0660", GROUP="audio"' \
-  | sudo tee /etc/udev/rules.d/60-respeaker.rules >/dev/null
+sudo cp "$SRC/60-respeaker.rules" /etc/udev/rules.d/
 sudo udevadm control --reload && sudo udevadm trigger --attr-match=idVendor=2886 || true
 # Dienst steuern und Herunterfahren aus der Web-Oberfläche ohne Passwort – nur diese Befehle
 echo "$ME ALL=(root) NOPASSWD: /usr/bin/systemctl restart grabstein, /usr/bin/systemctl stop grabstein, /usr/bin/systemctl start grabstein, /usr/bin/systemctl poweroff" \
