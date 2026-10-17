@@ -6,3 +6,4 @@ clips/
 .venv/
 venv/
 .DS_Store
+CLAUDE.local.md

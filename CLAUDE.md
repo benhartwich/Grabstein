@@ -1,14 +1,12 @@
 # Flüsternder Grabstein – Kontext für Claude Code
 
-Halloween-Deko von Benjamin: 3D-gedruckter Grabstein (Snapmaker U1) mit Raspberry Pi 4. Bewegungsmelder → Flüster-Clip, Radar „bleibt stehen“ → Live-Gespräch mit dem ElevenLabs-Agenten „Gustav“. Halloween ist am 31.10.
+3D-gedruckter Halloween-Grabstein mit Raspberry Pi 4. Bewegungsmelder → Flüster-Clip, Radar „bleibt stehen“ → Live-Gespräch mit dem ElevenLabs-Agenten „Gustav“. Persönliche Notizen und offene Aufgaben stehen in `CLAUDE.local.md` (nicht im Repo).
 
-## Arbeitsweise
+## Regeln
 
-- Benjamin arbeitet am Handy (Termius, tmux). Antworten kurz halten, auf Deutsch. Befehle selbst ausführen statt sie zum Abtippen zu schicken.
-- Er will nichts manuell machen müssen, schätzt aber ehrliche Widerworte mehr als Zustimmung.
-- **Geheimnisse:** `/etc/grabstein/grabstein.env` enthält den ElevenLabs-API-Key. Die Datei nie komplett ausgeben und nie committen. Zum Nachsehen: `sudo grep -v -E 'KEY|TOKEN' /etc/grabstein/grabstein.env`.
+- **Geheimnisse:** `/etc/grabstein/grabstein.env` enthält den ElevenLabs-API-Key. Die Datei nie komplett ausgeben und nie committen. Zum Nachsehen: `sudo grep -v -E 'KEY|TOKEN' /etc/grabstein/grabstein.env`. Spotify-Tokens liegen in `/var/lib/grabstein/spotify.json`.
 - Vor Änderungen an systemd, ALSA oder Paketen kurz sagen, was passiert.
-- Myboxi (anderes Projekt) ist geparkt, nicht anfassen.
+- Das Repo ist öffentlich: keine Schlüssel, IDs, Adressen oder Fotos mit Standortdaten committen.
 
 ## Hardware und Verkabelung
 
@@ -42,14 +40,3 @@ Modelle: Clips `eleven_v4`, Agent `eleven_v4_turbo` (beides bestätigt: Stimme p
 ## Verhalten (Kurzfassung)
 
 Hauptschleife alle 0,1 s; Web-Befehle laufen über eine Queue in die Schleife. Laufende Clips werden nie unterbrochen, Auslösungen währenddessen verfallen. Modus kommt aus Betriebsart (Automatik/Aus/Nur Musik/Lieb/Gruselig, optional befristet; „Nur Musik“ = Sensoren ruhen) bzw. Zeitplan (Wochentags- und Datums-Einträge; Datum ersetzt an dem Tag die Wochentage; bei Überschneidung gewinnt aus > gruselig > lieb > nur Musik). Ohne Zeitsync im Automatik-Betrieb nur „lieb“. Standard: Clip-Pause 45 s, Gesprächs-Pause 120 s, Gespräch max. 90 s, Ende nach 8 s Radar frei, Budget 20 min/Abend, 16:30–19:30 lieb, 19:30–22:30 gruselig. Von Hand gestartete Gespräche ignorieren das Radar.
-
-## Offene Aufgaben
-
-1. **Nächste Schritte:** Spotify verbinden + testen, Gespräch über den neuen Mischer testen → Katzenschwelle über Radar-Stärke. Musik: `Music` (mpg123 auf ALSA „musik“ = softvol vor dmix, Regler „Musik“), `spotify.py` (PKCE, Gerät „Grabstein“ = raspotify), Tracks in `/opt/grabstein/musik/`. Erledigt: Radar-Abstand, Gesprächsabstand `near_cm` (150) mit Lockruf-Gruppe „lure“, Auflegen nach 15 s Stille (`silence_end_call_timeout`).
-2. **LED-Streifen** (WS2812, SPI Pin 19, 5 V über Y-Verteiler an Pin 4, GND Pin 14) – Teile bestellt?
-3. **Test:** sanftes Gesprächsende (ZEIT UM nach 90 s), Audio-Tags statt „kicher“, keine Selbst-Unterbrechung mehr.
-4. **Optional Latenz:** Signed-URL vorab holen (erste Antwort ~1,2–1,7 s).
-
-Erledigt (17.10.): GitHub, Web-Oberfläche, Mikrofon (SYNC-Kopplung), Verkabelung geprüft und dokumentiert, Lautstärke 92 %, Gustav verabschiedet sich statt Abbruch, nicht unterbrechbar (client_events ohne interruption), erste Nachricht „Als was bist du denn verkleidet?“, sudo-Regel für Dienststeuerung.
-
-Nach jeder Änderung: committen und pushen.

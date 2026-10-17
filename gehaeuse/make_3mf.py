@@ -23,11 +23,8 @@ PLATES = [
     ]),
     ("Grabstein-Korpus", [("Korpus", [("Korpus", "2_Korpus_schwarz", 1)], (0, 0))]),
     ("Sockel", [("Sockel", [("Sockel", "3_Sockel_schwarz", 1)], (0, 0))]),
-    ("Bodenplatte + Klemmdeckel", [
-        ("Klemmdeckel", [("Klemmdeckel", "5_Klemmdeckel_schwarz", 1)], (0, -51.5)),
-        ("Bodenplatte", [("Bodenplatte", "4_Bodenplatte_schwarz", 1)], (0, 73.0)),
-    ]),
-    ("Klemmdeckel neu + Regendach", [
+    ("Bodenplatte", [("Bodenplatte", [("Bodenplatte", "4_Bodenplatte_schwarz", 1)], (0, 0))]),
+    ("Klemmdeckel + Regendach", [
         ("Klemmdeckel", [("Klemmdeckel", "5_Klemmdeckel_schwarz", 1)], (0, -60.0)),
         ("Regendach", [("Regendach", "6_Regendach_schwarz", 1)], (0, 75.0)),
     ]),
@@ -141,7 +138,7 @@ def build(out_path, plates=PLATES):
     return out_path
 
 
-FILENAMES = ["Druck_1_Frontplatte_4Farben.3mf", "Druck_2_Korpus.3mf", "Druck_3_Sockel.3mf", "Druck_4_Bodenplatte_Klemmdeckel.3mf", "Druck_5_Klemmdeckel_neu_Regendach.3mf"]
+FILENAMES = ["Druck_1_Frontplatte_4Farben.3mf", "Druck_2_Korpus.3mf", "Druck_3_Sockel.3mf", "Druck_4_Bodenplatte.3mf", "Druck_5_Klemmdeckel_Regendach.3mf"]
 
 if __name__ == "__main__":
     outdir = os.path.join(g.HERE, "druck")

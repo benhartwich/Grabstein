@@ -11,8 +11,8 @@ Fertige Druckdateien in `druck/` (Snapmaker Orca, alle Filament-Plätze auf PLA 
 | `Druck_1_Frontplatte_4Farben.3mf` | Frontplatte mit Netz, Schrift, Blut, Spinne, ReSpeaker-Halterung | 1 schwarz, 2 weiß, 3 gelb/leuchtend, 4 rot |
 | `Druck_2_Korpus.3mf` | Grabstein-Korpus | schwarz |
 | `Druck_3_Sockel.3mf` | Sockel (liegt kopfüber) | schwarz |
-| `Druck_4_Bodenplatte_Klemmdeckel.3mf` | Bodenplatte (der Klemmdeckel darin ist veraltet) | schwarz |
-| `Druck_5_Klemmdeckel_neu_Regendach.3mf` | Klemmdeckel mit Andruckstiften, Regendach | schwarz |
+| `Druck_4_Bodenplatte.3mf` | Bodenplatte | schwarz |
+| `Druck_5_Klemmdeckel_Regendach.3mf` | Klemmdeckel mit Andruckstiften, Regendach | schwarz |
 
 Die Frontplatte liegt mit der Sichtseite auf dem Bett; die Schrift ist im Modell gespiegelt und von vorne richtig lesbar. Keine Stützen nötig. 0,2–0,24 mm Schichthöhe, 3 Wände, 15 % Infill.
 
@@ -37,4 +37,4 @@ Die Frontplatte liegt mit der Sichtseite auf dem Bett; die Schrift ist im Modell
 
 Maße oben in `grabstein.py` ändern, dann `python3 grabstein.py && python3 vorschau.py && python3 make_3mf.py` (benötigt `pip install manifold3d trimesh shapely matplotlib numpy`).
 
-Schrift: UnifrakturMaguntia (SIL Open Font License 1.1).
+Schrift: UnifrakturMaguntia (SIL Open Font License 1.1). Gehäuse und Druckdaten: CC BY-NC-SA 4.0, siehe [`LICENSE-Druckdaten.md`](../LICENSE-Druckdaten.md).
