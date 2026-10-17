@@ -45,10 +45,11 @@ Hauptschleife alle 0,1 s; Web-Befehle laufen über eine Queue in die Schleife. L
 
 ## Offene Aufgaben
 
-1. **Mikrofon-Pegel prüfen:** Aufnahme läuft seit dem Stille-Fix, Pegel aber niedrig (Spitze ~850). Mit Transkript-Anzeige ein echtes Gespräch testen; ggf. Verstärkung per `xvf_host` (AGC) anheben.
-2. **Sensoren:** verkabelt und geprüft (siehe `software/verkabelung.html`, Fotos in `docs/`). Bewegungsmelder schaltet; Radar mit leerem Raum gegenprüfen, dann `Stehenbleiben ab`/`Weg nach` einstellen. Radar-Pins (Bauteilseite): VCC grau, GND weiß, OUT schwarz.
-3. **Optional Latenz weiter senken:** Signed-URL vorab holen und kurz cachen (erste Antwort derzeit 1,6 s).
+1. **Radar-Gegenprobe:** Raum leer → muss auf „frei“ fallen (bisher nur mit Person im Raum gesehen, Dauer-„da“).
+2. **LED-Ring des ReSpeakers:** blinkt dauernd (DoA-Anzeige). Über Seeeds `xvf_host` abschalten bzw. nur im Gespräch leuchten lassen.
+3. **Test:** sanftes Gesprächsende (ZEIT UM nach 90 s), Audio-Tags statt „kicher“, keine Selbst-Unterbrechung mehr.
+4. **Optional Latenz:** Signed-URL vorab holen (erste Antwort ~1,2–1,7 s).
 
-Erledigt (17.10.): GitHub (`benhartwich/Grabstein`), lgpio-Arbeitsverzeichnis, Lautsprecher an JST ohne Verstärker-Enable, `LAUTSTAERKE=100`, Web-Oberfläche, hängendes Gesprächsende (PortAudio) und taubes Mikrofon (SYNC-Kopplung) behoben, Wrapper startet Dienst nach Tests neu.
+Erledigt (17.10.): GitHub, Web-Oberfläche, Mikrofon (SYNC-Kopplung), Verkabelung geprüft und dokumentiert, Lautstärke 92 %, Gustav verabschiedet sich statt Abbruch, nicht unterbrechbar (client_events ohne interruption), erste Nachricht „Als was bist du denn verkleidet?“, sudo-Regel für Dienststeuerung.
 
 Nach jeder Änderung: committen und pushen.

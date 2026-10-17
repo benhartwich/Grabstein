@@ -616,6 +616,9 @@ def synthesize(text: str):
 WRAP_UP = ("ZEIT UM: Antworte noch kurz auf das, was der Besuch gerade gesagt hat, verabschiede dich "
            "dann in einem Satz und beende das Gespräch sofort mit dem Werkzeug end_call.")
 WRAP_GRACE_S = 30  # so lange darf die Verabschiedung dauern, dann wird hart beendet
+# Ohne "interruption": Gustav spricht jeden Satz zu Ende. Sonst hält er sein eigenes Echo
+# aus dem Lautsprecher für einen Zwischenruf und bricht ab.
+CLIENT_EVENTS = ["audio", "agent_response", "user_transcript", "agent_response_correction", "agent_tool_response"]
 
 
 class Talk:
@@ -830,7 +833,7 @@ def push_agent(prompt: str, first: str, talk_max_s: int) -> tuple[str, str]:
             },
         },
         "tts": {"voice_id": CFG["voice_id"], "model_id": CFG["agent_model"]},
-        "conversation": {"max_duration_seconds": talk_max_s + WRAP_GRACE_S + 15},
+        "conversation": {"max_duration_seconds": talk_max_s + WRAP_GRACE_S + 15, "client_events": CLIENT_EVENTS},
     })
     privacy = AgentPlatformSettingsRequestModel.model_validate(
         {"privacy": {"record_voice": False, "retention_days": 1}})
