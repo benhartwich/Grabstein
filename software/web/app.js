@@ -14,6 +14,7 @@ const MODE = {
 };
 const GROUP = {
   approach: { title: "Vorbeigehen", hint: "Kurz – wenn der Bewegungsmelder jemanden sieht." },
+  lure: { title: "Anlocken", hint: "Wenn jemand stehen bleibt, aber weiter weg ist als der Gesprächsabstand." },
   stay: { title: "Stehenbleiben", hint: "Statt eines Gesprächs, z. B. ohne Internet oder wenn das Budget leer ist." },
   leave: { title: "Abschied", hint: "Nach Zeitlimit oder leerem Budget." },
   gentle: { title: "Lieb", hint: "Kinder-Modus – freundlich, nicht gruselig." },
@@ -631,6 +632,7 @@ VIEWS.einstellungen = {
             <div class="fields">
               ${fieldSwitch("approach_clips", "Clips beim Vorbeigehen", "Bewegungsmelder löst kurze Clips aus.", s)}
               ${fieldNumber("stay_s", "Stehenbleiben ab", "So lange muss das Radar jemanden sehen.", "s", s)}
+              ${fieldNumber("near_cm", "Gesprächsabstand", "Näher → Gustav redet. Weiter weg → er lockt.", "cm", s)}
               ${fieldNumber("leave_s", "Weg nach", "So lange frei = Gespräch endet.", "s", s)}
               ${fieldNumber("cooldown_clip_s", "Pause nach Clip", "Bis zum nächsten Vorbei-Clip.", "s", s)}
               ${fieldNumber("cooldown_talk_s", "Pause nach Gespräch", "Bis zum nächsten Gespräch.", "s", s)}

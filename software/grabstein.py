@@ -69,7 +69,8 @@ CFG = {
     "web_port": env_int("WEB_PORT", 80),
     "web_pin": env("WEB_PIN", ""),
 }
-GROUPS = ("approach", "stay", "leave", "gentle")
+GROUPS = ("approach", "lure", "stay", "leave", "gentle")
+LURE_PAUSE_S = 20  # Abstand zwischen zwei Lockrufen, wenn jemand zu weit weg stehen bleibt
 MODES = ("off", "gentle", "full")
 LOG: deque[tuple[float, str]] = deque(maxlen=500)
 
@@ -89,6 +90,7 @@ def write_atomic(path: Path, text: str) -> None:
 ALL_DAYS = [0, 1, 2, 3, 4, 5, 6]
 NUMBERS = {  # Schlüssel: (min, max)
     "stay_s": (1, 60),
+    "near_cm": (50, 600),
     "leave_s": (2, 120),
     "cooldown_clip_s": (0, 900),
     "cooldown_talk_s": (0, 1800),
@@ -109,6 +111,7 @@ def default_settings() -> dict:
             {"id": "grusel", "days": ALL_DAYS, "date": None, "from": gentle_end, "until": end, "mode": "full"},
         ],
         "stay_s": env_int("STEHEN_SEKUNDEN", 4),
+        "near_cm": 150,
         "leave_s": env_int("WEG_SEKUNDEN", 8),
         "cooldown_clip_s": env_int("PAUSE_CLIP_SEKUNDEN", 45),
         "cooldown_talk_s": env_int("PAUSE_GESPRAECH_SEKUNDEN", 120),
@@ -1015,6 +1018,12 @@ class Sensors:
             if self.radar_free_since is None:
                 self.radar_free_since = now
 
+    def distance_cm(self) -> int | None:
+        """Abstand der erkannten Person laut Radar-Daten, None ohne frische Daten oder ohne Ziel."""
+        if not self.data.fresh() or not self.data.state:
+            return None
+        return self.data.dist_cm
+
     def stayed(self, seconds: float) -> bool:
         return self.radar_since is not None and time.monotonic() - self.radar_since >= seconds
 
@@ -1043,7 +1052,7 @@ class Grabstein:
         self.mode, self.mode_source = "off", "schedule"
         self.trusted = False
         self.net = False
-        self.next_clip = self.next_talk = 0.0
+        self.next_clip = self.next_talk = self.next_lure = 0.0
         self.started = time.time()
         self._stop = threading.Event()
 
@@ -1208,7 +1217,16 @@ class Grabstein:
             if mode == "off" or self.player.playing():
                 continue
 
-            # --- jemand bleibt stehen
+            # --- jemand bleibt stehen, aber zu weit weg: anlocken
+            dist = sensors.distance_cm()
+            if sensors.stayed(s["stay_s"]) and dist is not None and dist > s["near_cm"]:
+                if mono >= self.next_lure:
+                    if self.player.play("lure"):
+                        self.state.add(now, "clips")
+                    self.next_lure = mono + LURE_PAUSE_S
+                continue
+
+            # --- jemand bleibt nah genug stehen
             if sensors.stayed(s["stay_s"]) and mono >= self.next_talk:
                 self.state.add(now, "stays")
                 can_talk = (s["live_agent"] and CFG["agent_id"] and (mode == "full" or s["talk_gentle"])
