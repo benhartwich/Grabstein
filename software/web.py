@@ -87,6 +87,8 @@ def status(h, app: g.Grabstein):
             "transcript": list(app.transcript)[-12:],
         },
         "playing": app.player.label if app.player.playing() else None,
+        "music": {"on": s["music_on"], "source": s["music_source"], "level": round(app.music.level),
+                  "running": app.music.running()},
         "cooldown": {"clip": max(0, round(app.next_clip - mono)), "talk": max(0, round(app.next_talk - mono))},
         "today": {**today, "talk_min": round(talk_s / 60, 1), "budget_min": s["talk_budget_min"]},
         "log": [{"t": t, "hm": _hm(t), "msg": m} for t, m in list(g.LOG)[-8:]],
@@ -228,6 +230,65 @@ def clips_audio(h, app, group, cid):
     if not f:
         raise ApiError("Keine Audiodatei", 404)
     h.send_file(f)
+
+
+# ---------------------------------------------------------------- Musik
+def _spotify_state() -> str:
+    try:
+        return subprocess.run(["systemctl", "is-active", "raspotify"], capture_output=True, text=True,
+                              timeout=2).stdout.strip() or "unbekannt"
+    except (OSError, subprocess.SubprocessError):
+        return "unbekannt"
+
+
+@route("GET", r"/api/musik")
+def music_get(h, app):
+    return {"tracks": app.library.listing(), "busy": app.library.busy, "spotify": _spotify_state(),
+            "level": round(app.music.level), "running": app.music.running(), "tts": bool(g.CFG["api_key"])}
+
+
+@route("PUT", r"/api/musik/upload")
+def music_upload(h, app):
+    name = (h.query.get("name") or ["musik.mp3"])[0]
+    try:
+        return {"name": app.library.upload(name, h.raw(60 * 1024 * 1024))}
+    except ValueError as e:
+        raise ApiError(str(e)) from None
+
+
+@route("DELETE", r"/api/musik/([\w.-]+)")
+def music_delete(h, app, name):
+    try:
+        app.library.delete(name)
+    except ValueError as e:
+        raise ApiError(str(e)) from None
+    return {"ok": True}
+
+
+@route("GET", r"/api/musik/([\w.-]+)/audio")
+def music_audio(h, app, name):
+    f = app.library.file(name)
+    if not f:
+        raise ApiError("Stück nicht gefunden", 404)
+    h.send_file(f)
+
+
+@route("POST", r"/api/musik/erzeugen")
+def music_generate(h, app):
+    body = h.json()
+    prompt, seconds = str(body.get("prompt", "")).strip(), int(body.get("seconds") or 90)
+    if not prompt:
+        raise ApiError("Beschreibung fehlt")
+    if app.library.busy:
+        raise ApiError("Es wird schon ein Stück erzeugt", 409)
+
+    def work():
+        try:
+            app.library.generate(prompt, seconds)
+        except Exception as e:  # noqa: BLE001
+            g.log(f"Musik nicht erzeugt: {str(e)[:160]}")
+    threading.Thread(target=work, daemon=True).start()
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------- Gustav

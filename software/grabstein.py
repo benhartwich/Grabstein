@@ -97,8 +97,11 @@ NUMBERS = {  # Schlüssel: (min, max)
     "talk_max_s": (20, 600),
     "talk_budget_min": (0, 600),
     "volume": (0, 100),
+    "music_volume": (0, 100),
+    "music_duck": (0, 100),
 }
-FLAGS = ("live_agent", "talk_gentle", "approach_clips", "transcripts", "leds")
+FLAGS = ("live_agent", "talk_gentle", "approach_clips", "transcripts", "leds", "music_on")
+MUSIC_SOURCES = ("tracks", "stream", "spotify")
 
 
 def default_settings() -> dict:
@@ -124,6 +127,11 @@ def default_settings() -> dict:
         "transcripts": env("LOG_TRANSKRIPTE", "0") == "1",
         "leds": True,
         "codeword": "Kürbiskern",
+        "music_on": False,
+        "music_source": "tracks",
+        "music_stream_url": "",
+        "music_volume": 60,
+        "music_duck": 25,
     }
 
 
@@ -167,6 +175,15 @@ def clean_setting(key: str, value):
         return v
     if key in FLAGS:
         return bool(value)
+    if key == "music_source":
+        if value not in MUSIC_SOURCES:
+            raise ValueError("Musikquelle unbekannt")
+        return value
+    if key == "music_stream_url":
+        url = str(value or "").strip()
+        if url and not re.fullmatch(r"https?://\S{4,500}", url):
+            raise ValueError("Stream-Adresse bitte mit http:// oder https://")
+        return url
     if key == "codeword":
         word = str(value or "").strip()
         if not 2 <= len(word) <= 30:
@@ -345,8 +362,8 @@ class State:
 def set_volume(percent: int) -> None:
     """Setzt alle Wiedergaberegler der Standard-Soundkarte (ReSpeaker).
 
-    Nur Regler mit pvolume (der Mikrofonregler „Headset“ bleibt unberührt),
-    mit Index, weil der ReSpeaker zwei „PCM“-Regler hat."""
+    Nur Regler mit pvolume (der Mikrofonregler „Headset“ bleibt unberührt), mit Index, weil der
+    ReSpeaker zwei „PCM“-Regler hat. „Musik“ (softvol aus asound.conf) regelt die Klasse Music."""
     try:
         out = subprocess.run(["amixer", "scontents"], capture_output=True, text=True, timeout=3).stdout
         control = None
@@ -354,7 +371,7 @@ def set_volume(percent: int) -> None:
             if line.startswith("Simple mixer control"):
                 name, index = line.split("'")[1], line.rsplit(",", 1)[1]
                 control = f"{name},{index}"
-            elif control and "Capabilities:" in line and "pvolume" in line.split():
+            elif control and not control.startswith("Musik,") and "Capabilities:" in line and "pvolume" in line.split():
                 subprocess.run(["amixer", "-q", "sset", control, f"{percent}%", "unmute"],
                                capture_output=True, timeout=3)
     except (OSError, subprocess.SubprocessError) as e:
@@ -638,6 +655,168 @@ class ClipPlayer:
     def wait(self) -> None:
         if self.proc is not None:
             self.proc.wait()
+
+
+# ---------------------------------------------------------------- Musik
+class MusicLibrary:
+    """Eigene und erzeugte Musikstücke als MP3 in einem Ordner; Beschreibungen erzeugter Stücke in tracks.json."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.meta_path = root / "tracks.json"
+        self.busy = ""  # Beschreibung des Stücks, das gerade erzeugt wird
+        self.version = 0  # zählt bei jeder Änderung hoch, damit der Spieler neu mischt
+        try:
+            self.meta = json.loads(self.meta_path.read_text())
+        except (OSError, ValueError):
+            self.meta = {}
+
+    def files(self) -> list[Path]:
+        return sorted(f for f in self.root.glob("*") if f.suffix.lower() in (".mp3", ".wav")) if self.root.is_dir() else []
+
+    def listing(self) -> list[dict]:
+        return [{"name": f.name, "mb": round(f.stat().st_size / 1e6, 1), "prompt": self.meta.get(f.name, "")}
+                for f in self.files()]
+
+    def file(self, name: str) -> Path | None:
+        f = self.root / name
+        return f if re.fullmatch(r"[\w.-]{1,80}", name) and f in self.files() else None
+
+    def _save_meta(self) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        write_atomic(self.meta_path, json.dumps(self.meta, ensure_ascii=False, indent=1))
+
+    def _free_name(self, stem: str, suffix: str) -> Path:
+        stem = re.sub(r"[^\w-]", "_", stem)[:40].strip("_") or "musik"
+        f, n = self.root / f"{stem}{suffix}", 2
+        while f.exists():
+            f, n = self.root / f"{stem}-{n}{suffix}", n + 1
+        return f
+
+    def upload(self, name: str, data: bytes) -> str:
+        suffix = Path(name).suffix.lower()
+        if suffix not in (".mp3", ".wav") or not data:
+            raise ValueError("Bitte eine MP3- oder WAV-Datei wählen")
+        self.root.mkdir(parents=True, exist_ok=True)
+        f = self._free_name(Path(name).stem, suffix)
+        f.write_bytes(data)
+        self.version += 1
+        return f.name
+
+    def delete(self, name: str) -> None:
+        f = self.file(name)
+        if not f:
+            raise ValueError("Stück nicht gefunden")
+        f.unlink()
+        self.meta.pop(name, None)
+        self._save_meta()
+        self.version += 1
+
+    def generate(self, prompt: str, seconds: int) -> str:
+        """Erzeugt ein Instrumentalstück mit ElevenLabs Music (blockiert, oft eine Minute und mehr)."""
+        from elevenlabs.client import ElevenLabs
+        prompt = prompt.strip()[:500]
+        if not prompt:
+            raise ValueError("Beschreibung fehlt")
+        if not CFG["api_key"]:
+            raise ValueError("ELEVENLABS_API_KEY fehlt")
+        if self.busy:
+            raise ValueError("Es wird schon ein Stück erzeugt")
+        self.busy = prompt
+        try:
+            audio = ElevenLabs(api_key=CFG["api_key"]).music.compose(
+                prompt=prompt, music_length_ms=max(10, min(300, seconds)) * 1000, force_instrumental=True)
+            self.root.mkdir(parents=True, exist_ok=True)
+            f = self._free_name("erzeugt-" + "-".join(prompt.split()[:4]), ".mp3")
+            tmp = f.with_suffix(".tmp")
+            with tmp.open("wb") as fh:
+                for chunk in audio:
+                    fh.write(chunk)
+            os.replace(tmp, f)
+            self.meta[f.name] = prompt
+            self._save_meta()
+            self.version += 1
+            log(f"Musik erzeugt: {f.name}")
+            return f.name
+        finally:
+            self.busy = ""
+
+
+class Music:
+    """Hintergrundmusik über das ALSA-Gerät „musik“ (softvol-Regler „Musik“ vor dem dmix-Mischer).
+    Eigene Tracks und Web-Streams spielt mpg123; Spotify kommt über raspotify auf dasselbe Gerät.
+    Ein- und Ausblenden geschieht nur über den Regler, die Quelle läuft einfach weiter."""
+    FADE_S = 2.0
+
+    def __init__(self, library: MusicLibrary) -> None:
+        self.library = library
+        self.proc: subprocess.Popen | None = None
+        self.key: tuple | None = None       # was gerade läuft (Quelle, Adresse, Bibliotheksstand)
+        self.retry_at = 0.0
+        self.level = 0.0                     # aktuelle Lautstärke in %
+        self.applied = -1
+        self.applied_at = 0.0
+
+    def running(self) -> bool:
+        return self.proc is not None and self.proc.poll() is None
+
+    def _stop(self) -> None:
+        if self.running():
+            self.proc.terminate()
+            try:
+                self.proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.proc.kill()
+        self.proc, self.key = None, None
+
+    def _start(self, key: tuple) -> None:
+        source, url, _ = key
+        cmd = ["mpg123", "-q", "-o", "alsa", "-a", "musik"]
+        if source == "stream":
+            cmd += (["-@", url] if re.search(r"\.(m3u8?|pls)(\?|$)", url) else [url])
+        else:
+            files = self.library.files()
+            if not files:
+                return
+            cmd += ["-Z", *map(str, files)]  # zufällig, endlos
+        try:
+            self.proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.key = key
+            log("Musik: " + ("Stream " + url if source == "stream" else f"{len(files)} eigene Stücke"))
+        except OSError as e:
+            log(f"Musik nicht abspielbar: {e}")
+
+    def update(self, s: dict, active: bool, target: float) -> None:
+        """Einmal pro Takt: Quelle starten/stoppen, Lautstärke in Richtung target (in %) blenden."""
+        mono = time.monotonic()
+        want = None
+        if s["music_on"] and active and s["music_source"] in ("tracks", "stream"):
+            if s["music_source"] == "tracks" or s["music_stream_url"]:
+                want = (s["music_source"], s["music_stream_url"], self.library.version)
+        if not (s["music_on"] and active):
+            target = 0.0
+        # Ausschalten erst, wenn ausgeblendet ist – sonst bricht die Musik hart ab
+        fading_out = want is None and self.running() and self.level > 0
+        if not fading_out and (want != self.key or (want and not self.running())):
+            if self.running() or self.key:
+                self._stop()
+            if want and mono >= self.retry_at:
+                self._start(want)
+                self.retry_at = mono + 10  # bricht ein Stream ab, frühestens in 10 s neu verbinden
+        if fading_out:
+            target = 0.0
+        step = max(1.0, s["music_volume"] / (self.FADE_S * 10))
+        self.level += max(-step, min(step, target - self.level))
+        # Regler auch regelmäßig neu setzen: er entsteht erst, wenn das Gerät „musik“ zum ersten Mal
+        # geöffnet wird (z. B. durch Spotify), und stünde dann auf 100 %
+        if round(self.level) != self.applied or mono - self.applied_at > 3:
+            self.applied, self.applied_at = round(self.level), mono
+            subprocess.run(["amixer", "-q", "-c", "Array", "sset", "Musik", f"{self.applied}%"],
+                           capture_output=True, timeout=3)
+
+    def stop(self) -> None:
+        self._stop()
+        subprocess.run(["amixer", "-q", "-c", "Array", "sset", "Musik", "0%"], capture_output=True, timeout=3)
 
 
 # ---------------------------------------------------------------- ElevenLabs
@@ -1047,6 +1226,8 @@ class Grabstein:
         self.clips = Clips(CFG["clips_dir"], data / "clips.json")
         self.gustav = Gustav(data / "gustav.json")
         self.player = ClipPlayer(self.clips)
+        self.library = MusicLibrary(CFG["clips_dir"].parent / "musik")
+        self.music = Music(self.library)
         self.sensors: Sensors | None = None
         self.talk: Talk | None = None
         self.transcript: deque[dict] = deque(maxlen=60)
@@ -1184,6 +1365,13 @@ class Grabstein:
             if mode != last_mode:
                 log(f"Modus: {mode}" + ("" if self.trusted else " (Uhrzeit noch nicht synchronisiert)"))
                 last_mode = mode
+            if self.talk is not None:
+                music_target = 0.0
+            elif self.player.playing():
+                music_target = s["music_volume"] * s["music_duck"] / 100
+            else:
+                music_target = s["music_volume"]
+            self.music.update(s, mode != "off", music_target)
             if not s["leds"]:
                 leds.show(Leds.OFF)
             elif self.talk is not None:
@@ -1250,6 +1438,7 @@ class Grabstein:
         if self.talk is not None:
             self.talk.stop()
         self.player.stop()
+        self.music.stop()
         leds.show(Leds.OFF)
         log("Grabstein beendet")
 

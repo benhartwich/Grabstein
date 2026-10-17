@@ -1,0 +1,17 @@
+# Flüsternder Grabstein – Ton über den ReSpeaker (@CARD@)
+# Wiedergabe über einen Mischer (dmix), damit Musik, Clips und Gustav gleichzeitig laufen können.
+# Aufnahme nur Kanal 0 (aufbereitetes Signal mit Echounterdrückung).
+pcm.!default { type asym; playback.pcm "grabstein_out"; capture.pcm "grabstein_in" }
+pcm.grabstein_mix {
+  type dmix
+  ipc_key 3141
+  ipc_perm 0666
+  slave { pcm "hw:@CARD@,0"; rate 16000; channels 2; format S16_LE; period_size 320; buffer_size 3200 }
+}
+pcm.grabstein_out { type plug; slave.pcm "grabstein_mix" }
+pcm.grabstein_in { type plug; slave.pcm "grabstein_route" }
+pcm.grabstein_route { type route; slave { pcm "hw:@CARD@,0"; channels 2 } ttable.0.0 1 }
+# Musik mit eigenem Regler „Musik“ – darüber blendet der Grabstein ein und aus
+pcm.musik { type plug; slave.pcm "musik_vol" }
+pcm.musik_vol { type softvol; slave.pcm "grabstein_mix"; control { name "Musik"; card @CARD@ } }
+ctl.!default { type hw; card @CARD@ }

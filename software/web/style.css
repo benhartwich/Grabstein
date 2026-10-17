@@ -59,7 +59,7 @@ a { color: var(--accent); }
 
 .tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
-  display: grid; grid-template-columns: repeat(5, 1fr);
+  display: grid; grid-template-columns: repeat(6, 1fr);
   height: calc(var(--nav-h) + var(--safe-b)); padding-bottom: var(--safe-b);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -67,7 +67,7 @@ a { color: var(--accent); }
 }
 .tabs a {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  color: var(--muted); text-decoration: none; font-size: .72rem; font-weight: 550;
+  color: var(--muted); text-decoration: none; font-size: .68rem; font-weight: 550;
 }
 .tabs a.active { color: var(--accent); }
 .tabs a.active svg { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 60%, transparent)); }
@@ -307,6 +307,11 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 30px; }
 .clip-edit .row { justify-content: flex-end; }
 .add { display: grid; gap: 8px; padding-top: 12px; border-top: 1px dashed var(--border); }
 .add .row { justify-content: space-between; }
+.track { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+.track:first-child { border-top: 0; }
+.track .name { font-size: .92rem; word-break: break-word; }
+.track .sub { color: var(--muted); font-size: .8rem; }
+.steps { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: .92rem; }
 .spin { width: 16px; height: 16px; border: 2px solid var(--surface-3); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; vertical-align: -3px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

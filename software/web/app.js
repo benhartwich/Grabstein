@@ -532,6 +532,108 @@ VIEWS.clips = {
   },
 };
 
+// ---------------------------------------------------------------- Musik
+VIEWS.musik = {
+  timer: null,
+  async open() {
+    $("#view-musik").innerHTML = `<div class="card"><p class="muted">Lade …</p></div>`;
+    await run(loadSettings);
+    if (S.settings) await this.load();
+  },
+  async load() {
+    clearTimeout(this.timer);
+    const d = await run(() => api("GET", "/api/musik"));
+    if (!d) return;
+    this.data = d;
+    if (!$("#view-musik textarea:focus, #view-musik input[type=url]:focus")) this.render();
+    if (S.tab === "musik") this.timer = setTimeout(() => this.load(), d.busy ? 3000 : 8000);
+  },
+  render() {
+    const s = S.settings, d = this.data;
+    const src = s.music_source;
+    const state = !s.music_on ? "aus" : d.level > 0 ? `läuft · ${d.level} %` : "bereit (blendet ein, sobald aktiv)";
+    $("#view-musik").innerHTML = `
+      <div class="cols">
+        <div class="stack">
+          <div class="card">
+            <div class="card-head"><h2>Hintergrundmusik</h2><span class="muted">${esc(state)}</span></div>
+            <p class="intro small">Läuft, solange der Grabstein aktiv ist. Spielt ein Clip, wird sie leiser; spricht Gustav, blendet sie ganz aus und danach wieder ein.</p>
+            <div class="fields">${fieldSwitch("music_on", "Musik an", "Nur wenn die Betriebsart nicht „Aus“ ist.", s)}</div>
+            <div class="seg" id="mu-src">
+              ${[["tracks", "Eigene Tracks"], ["stream", "Web-Stream"], ["spotify", "Spotify"]].map(([k, l]) => `<button type="button" data-src="${k}" class="${src === k ? "active" : ""}">${l}</button>`).join("")}
+            </div>
+            <div class="range"><input type="range" min="0" max="100" id="mu-vol" value="${s.music_volume}" aria-label="Musik-Lautstärke"><output id="mu-vol-out">${s.music_volume} %</output></div>
+            <p class="small muted" style="margin-top:-6px">Lautstärke der Musik (Gustav bleibt bei ${s.volume} %)</p>
+            <div class="range"><input type="range" min="0" max="100" id="mu-duck" value="${s.music_duck}" aria-label="Bei Clips"><output id="mu-duck-out">${s.music_duck} %</output></div>
+            <p class="small muted" style="margin-top:-6px">So viel davon bleibt, während ein Clip läuft</p>
+          </div>
+          ${src === "stream" ? `<div class="card">
+            <h2>Web-Stream</h2>
+            <form class="row" id="mu-url-form"><input type="url" id="mu-url" placeholder="https://… (MP3-Stream oder .m3u/.pls)" value="${esc(s.music_stream_url)}"><button class="btn primary">Speichern</button></form>
+            <p class="small muted">Die meisten Internetradios bieten einen MP3-Stream an. AAC/HLS-Streams (.m3u8) spielt der Grabstein nicht.</p>
+          </div>` : ""}
+          ${src === "spotify" ? `<div class="card">
+            <div class="card-head"><h2>Spotify</h2><span class="muted">Dienst: ${esc(d.spotify)}</span></div>
+            ${d.spotify === "active" ? `<ol class="steps">
+              <li>Spotify am Handy öffnen (im selben WLAN).</li>
+              <li>Unten auf das Gerätesymbol tippen und <b>„Grabstein“</b> wählen.</li>
+              <li>Deine Halloween-Playlist starten, Wiederholen einschalten.</li>
+              <li>Ein- und Ausblenden macht der Grabstein, die Spotify-Lautstärke bleibt auf voll.</li>
+            </ol>` : `<p class="muted small">Spotify Connect (raspotify) ist noch nicht eingerichtet – das macht ein einmaliges Skript.</p>`}
+          </div>` : ""}
+        </div>
+        <div class="stack">
+          <div class="card">
+            <div class="card-head"><h2>Eigene Tracks</h2><span class="muted">${d.tracks.length} Stück${d.tracks.length === 1 ? "" : "e"}</span></div>
+            <div>${d.tracks.map((t) => `<div class="track" data-name="${esc(t.name)}">
+                <div><div class="name">${esc(t.prompt || t.name)}</div><div class="sub">${t.prompt ? "erzeugt · " : ""}${t.mb.toLocaleString("de-AT")} MB</div></div>
+                <div class="row"><button class="icon-btn" data-act="listen" title="Am Handy anhören">${icon("phone")}</button><button class="icon-btn" data-act="del" title="Löschen">${icon("trash")}</button></div>
+              </div>`).join("") || `<p class="empty">Noch keine Stücke – hochladen oder erzeugen.</p>`}</div>
+            <label class="btn ghost">${icon("upload")}MP3 hochladen<input type="file" accept="audio/mpeg,audio/wav,.mp3,.wav" id="mu-upload" hidden></label>
+          </div>
+          <div class="card">
+            <h2>Stück erzeugen</h2>
+            <p class="intro small">ElevenLabs komponiert ein Instrumentalstück nach deiner Beschreibung. Dauert etwa eine halbe Minute und kostet Guthaben.</p>
+            ${d.busy ? `<p class="small"><span class="spin"></span> Wird erzeugt: ${esc(d.busy)}</p>` : ""}
+            <textarea id="mu-prompt" rows="3" maxlength="500" placeholder="z. B. düsteres Halloween-Ambient, Wind, ferne Spieluhr, langsam, geheimnisvoll, loopbar"></textarea>
+            <div class="row"><select id="mu-len" aria-label="Länge">${[60, 90, 120, 180].map((n) => `<option value="${n}" ${n === 120 ? "selected" : ""}>${(n / 60).toLocaleString("de-AT")} min</option>`).join("")}</select>
+              <button class="btn primary" id="mu-gen" ${d.busy || !d.tts ? "disabled" : ""}>Erzeugen</button></div>
+          </div>
+        </div>
+      </div>`;
+    const v = $("#view-musik");
+    bindFieldsOnce(v);
+    $("#mu-src").onclick = (e) => { const b = e.target.closest("button"); if (b) saveSettings({ music_source: b.dataset.src }, "Quelle geändert").then(() => this.render()); };
+    const slider = (id, key, label) => {
+      const el = $(id), out = $(id + "-out");
+      el.oninput = () => { out.textContent = `${el.value} %`; };
+      el.onchange = () => saveSettings({ [key]: Number(el.value) }, `${label} ${el.value} %`);
+    };
+    slider("#mu-vol", "music_volume", "Musik");
+    slider("#mu-duck", "music_duck", "Bei Clips");
+    const form = $("#mu-url-form");
+    if (form) form.onsubmit = (e) => { e.preventDefault(); saveSettings({ music_stream_url: $("#mu-url").value }, "Stream gespeichert"); };
+    $("#mu-upload").onchange = async (e) => {
+      const f = e.target.files[0]; if (!f) return;
+      await run(() => api("PUT", `/api/musik/upload?name=${encodeURIComponent(f.name)}`, undefined, f), "Hochgeladen");
+      this.load();
+    };
+    $("#mu-gen").onclick = async () => {
+      const prompt = $("#mu-prompt").value.trim(); if (!prompt) return $("#mu-prompt").focus();
+      $("#mu-prompt").value = "";
+      await run(() => api("POST", "/api/musik/erzeugen", { prompt, seconds: Number($("#mu-len").value) }), "Wird erzeugt …");
+      this.load();
+    };
+    v.querySelectorAll(".track [data-act]").forEach((b) => b.onclick = async () => {
+      const name = b.closest(".track").dataset.name;
+      if (b.dataset.act === "listen") { VIEWS.clips.audio?.pause(); VIEWS.clips.audio = new Audio(`/api/musik/${encodeURIComponent(name)}/audio`); return VIEWS.clips.audio.play(); }
+      if (!confirm("Dieses Stück löschen?")) return;
+      await run(() => api("DELETE", `/api/musik/${encodeURIComponent(name)}`), "Gelöscht");
+      this.load();
+    });
+  },
+};
+
 // ---------------------------------------------------------------- Gustav
 VIEWS.gustav = {
   async open() {
@@ -603,6 +705,12 @@ function fieldText(key, label, hint, s) {
 function fieldSwitch(key, label, hint, s) {
   return `<div class="field"><label for="f-${key}">${label}<span class="hint">${hint}</span></label>
     <label class="switch"><input type="checkbox" id="f-${key}" data-key="${key}" ${s[key] ? "checked" : ""}><span></span></label></div>`;
+}
+function bindFieldsOnce(root) {
+  // Ansichten, die sich neu zeichnen, binden den Listener nur einmal
+  if (root.dataset.bound) return;
+  root.dataset.bound = "1";
+  bindFields(root);
 }
 function bindFields(root) {
   root.addEventListener("change", (e) => {
