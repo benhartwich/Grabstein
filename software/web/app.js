@@ -536,6 +536,7 @@ VIEWS.gustav = {
               ${fieldNumber("talk_max_s", "Höchstdauer", "Danach verabschiedet er sich.", "s", s)}
               ${fieldNumber("talk_budget_min", "Budget pro Abend", "Kostenbremse für ElevenLabs.", "min", s)}
               ${fieldSwitch("transcripts", "Mitschrift anzeigen", "Nur im Arbeitsspeicher, weg nach Neustart.", s)}
+              ${fieldText("codeword", "Rätsel-Codewort", "Verrät Gustav nach einem gelösten Rätsel – wer es an der Tür sagt, bekommt ein Extra-Zuckerl.", s)}
             </div>
           </div>
           <div class="card">
@@ -577,6 +578,10 @@ function fieldNumber(key, label, hint, unit, s) {
   return `<div class="field"><label for="f-${key}">${label}<span class="hint">${hint}</span></label>
     <div class="unit"><input type="number" inputmode="numeric" id="f-${key}" data-key="${key}" value="${s[key]}">${unit}</div></div>`;
 }
+function fieldText(key, label, hint, s) {
+  return `<div class="field"><label for="f-${key}">${label}<span class="hint">${hint}</span></label>
+    <input type="text" class="short" id="f-${key}" data-key="${key}" value="${esc(s[key])}" maxlength="30"></div>`;
+}
 function fieldSwitch(key, label, hint, s) {
   return `<div class="field"><label for="f-${key}">${label}<span class="hint">${hint}</span></label>
     <label class="switch"><input type="checkbox" id="f-${key}" data-key="${key}" ${s[key] ? "checked" : ""}><span></span></label></div>`;
@@ -584,7 +589,7 @@ function fieldSwitch(key, label, hint, s) {
 function bindFields(root) {
   root.addEventListener("change", (e) => {
     const t = e.target, key = t.dataset.key; if (!key) return;
-    const value = t.type === "checkbox" ? t.checked : Number(t.value);
+    const value = t.type === "checkbox" ? t.checked : t.type === "text" ? t.value : Number(t.value);
     saveSettings({ [key]: value }).then(() => { if (S.settings) t.type === "checkbox" ? (t.checked = S.settings[key]) : (t.value = S.settings[key]); });
   });
 }
@@ -621,6 +626,7 @@ VIEWS.einstellungen = {
               <output id="vol-out">${s.volume} %</output>
             </div>
             <div class="btn-row"><button class="btn" id="tone">${icon("play")}Testton</button></div>
+            <div class="fields">${fieldSwitch("leds", "LED-Ring", "Aus im Ruhezustand, atmet bei Clips, pulsiert im Gespräch mit Gustavs Stimme.", s)}</div>
           </div>
           <div class="card">
             <div class="card-head"><h2>Verlauf</h2><span class="muted">pro Abend</span></div>

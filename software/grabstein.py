@@ -96,7 +96,7 @@ NUMBERS = {  # Schlüssel: (min, max)
     "talk_budget_min": (0, 600),
     "volume": (0, 100),
 }
-FLAGS = ("live_agent", "talk_gentle", "approach_clips", "transcripts")
+FLAGS = ("live_agent", "talk_gentle", "approach_clips", "transcripts", "leds")
 
 
 def default_settings() -> dict:
@@ -119,6 +119,8 @@ def default_settings() -> dict:
         "talk_gentle": False,
         "approach_clips": True,
         "transcripts": env("LOG_TRANSKRIPTE", "0") == "1",
+        "leds": True,
+        "codeword": "Kürbiskern",
     }
 
 
@@ -162,6 +164,11 @@ def clean_setting(key: str, value):
         return v
     if key in FLAGS:
         return bool(value)
+    if key == "codeword":
+        word = str(value or "").strip()
+        if not 2 <= len(word) <= 30:
+            raise ValueError("Codewort: 2 bis 30 Zeichen")
+        return word
     if key == "schedule":
         if not isinstance(value, list) or len(value) > 60:
             raise ValueError("Zeitplan ungültig")
@@ -349,6 +356,50 @@ def set_volume(percent: int) -> None:
                                capture_output=True, timeout=3)
     except (OSError, subprocess.SubprocessError) as e:
         log(f"Lautstärke nicht gesetzt: {e}")
+
+
+class Leds:
+    """LED-Ring des ReSpeaker XVF3800 – dieselben USB-Steuerbefehle wie Seeeds xvf_host.py.
+    Aus im Ruhezustand, grünes Atmen bei Clips, im Gespräch pulsiert das Grün mit Gustavs Stimme."""
+    RESID = 20
+    EFFECT, SPEED, COLOR = 12, 15, 16          # Befehls-IDs: Effekt (uint8), Tempo (uint8), Farbe (uint32)
+    OFF, BREATH, SINGLE = 0, 1, 3
+    GREEN = (0x40, 0xFF, 0x70)
+
+    def __init__(self) -> None:
+        self.dev = None
+        self.last: tuple | None = None
+        try:
+            import usb.core
+            self.dev = usb.core.find(idVendor=0x2886, idProduct=0x001A)
+        except Exception as e:  # noqa: BLE001
+            log(f"LED-Ring nicht nutzbar: {e}")
+        if self.dev is None:
+            log("LED-Ring: ReSpeaker nicht gefunden")
+
+    def _write(self, cmd: int, value: int, size: int) -> None:
+        import usb.util
+        self.dev.ctrl_transfer(usb.util.CTRL_OUT | usb.util.CTRL_TYPE_VENDOR | usb.util.CTRL_RECIPIENT_DEVICE,
+                               0, cmd, self.RESID, value.to_bytes(size, "little"), 1000)
+
+    def show(self, effect: int, level: float = 1.0) -> None:
+        """effect: OFF, BREATH oder SINGLE; level 0..1 dimmt die Farbe (nur SINGLE)."""
+        state = (effect, round(level * 12))  # in Stufen, damit nicht jeder Takt USB-Verkehr macht
+        if self.dev is None or state == self.last:
+            return
+        try:
+            if effect != (self.last or (None,))[0]:
+                if effect == self.BREATH:
+                    self._write(self.SPEED, 2, 1)
+                    self._write(self.COLOR, int.from_bytes(bytes(self.GREEN), "big"), 4)
+                self._write(self.EFFECT, effect, 1)
+            if effect == self.SINGLE:
+                r, g, b = (int(c * state[1] / 12) for c in self.GREEN)
+                self._write(self.COLOR, (r << 16) | (g << 8) | b, 4)
+            self.last = state
+        except Exception as e:  # noqa: BLE001 – z. B. fehlende USB-Rechte: einmal melden, dann Ruhe
+            log(f"LED-Ring nicht steuerbar ({e}) – udev-Regel fehlt? Siehe install.sh")
+            self.dev = None
 
 
 def tone_file() -> Path:
@@ -613,8 +664,14 @@ def synthesize(text: str):
             output_format="mp3_44100_128"))
 
 
-WRAP_UP = ("ZEIT UM: Antworte noch kurz auf das, was der Besuch gerade gesagt hat, verabschiede dich "
-           "dann in einem Satz und beende das Gespräch sofort mit dem Werkzeug end_call.")
+def _rms(pcm: bytes) -> float:
+    samples = memoryview(pcm).cast("h") if len(pcm) % 2 == 0 else memoryview(pcm[:-1]).cast("h")
+    return (sum(x * x for x in samples) / max(1, len(samples))) ** 0.5
+
+
+WRAP_UP = ("ZEIT UM: Antworte noch kurz auf das, was der Besuch gerade gesagt hat. Ist ein Rätsel offen, "
+           "verrate jetzt die Lösung. Verabschiede dich dann in einem Satz und beende das Gespräch "
+           "sofort mit dem Werkzeug end_call.")
 WRAP_GRACE_S = 30  # so lange darf die Verabschiedung dauern, dann wird hart beendet
 # Ohne "interruption": Gustav spricht jeden Satz zu Ende. Sonst hält er sein eigenes Echo
 # aus dem Lautsprecher für einen Zwischenruf und bricht ab.
@@ -624,7 +681,7 @@ CLIENT_EVENTS = ["audio", "agent_response", "user_transcript", "agent_response_c
 class Talk:
     """Ein Gespräch mit dem ElevenLabs-Agenten über Mikrofon und Lautsprecher des ReSpeaker."""
 
-    def __init__(self, mode: str, on_text=None) -> None:
+    def __init__(self, mode: str, on_text=None, codeword: str = "Kürbiskern") -> None:
         from elevenlabs.client import ElevenLabs
         from elevenlabs.conversational_ai.conversation import (AudioInterface, Conversation,
                                                                ConversationInitiationData)
@@ -641,6 +698,7 @@ class Talk:
 
             def __init__(inner) -> None:  # noqa: N805
                 inner.drain = True  # beim Auflegen durch Gustav erst fertig sprechen lassen
+                inner.level = 0.0   # aktuelle Lautstärke von Gustavs Stimme 0..1 (für den LED-Ring)
                 inner.first = True
                 inner.out: queue.Queue[bytes] = queue.Queue()
                 inner.stopped = threading.Event()
@@ -677,8 +735,12 @@ class Talk:
                         except queue.Empty:
                             audio = inner.SILENCE  # aplay blockiert bei vollem Puffer – das gibt den Takt
                         try:
-                            inner.play.stdin.write(audio)
-                            inner.play.stdin.flush()
+                            # in 20-ms-Stücken schreiben: aplay gibt den Takt vor, der Pegel läuft mit
+                            for i in range(0, len(audio), len(inner.SILENCE)):
+                                piece = audio[i:i + len(inner.SILENCE)]
+                                inner.play.stdin.write(piece)
+                                inner.play.stdin.flush()
+                                inner.level = max(_rms(piece) / 4000, inner.level * 0.75)
                         except (OSError, ValueError):
                             break
 
@@ -735,7 +797,7 @@ class Talk:
             CFG["agent_id"],
             requires_auth=bool(key),
             audio_interface=self.audio,
-            config=ConversationInitiationData(dynamic_variables={"modus": mode}),
+            config=ConversationInitiationData(dynamic_variables={"modus": mode, "codewort": codeword}),
             callback_agent_response=lambda t: say("Gustav", t),
             callback_user_transcript=lambda t: say("Besuch", t),
             callback_end_session=self.ended.set,
@@ -825,7 +887,7 @@ def push_agent(prompt: str, first: str, talk_max_s: int) -> tuple[str, str]:
         "agent": {
             "first_message": first,
             "language": "de",
-            "dynamic_variables": {"dynamic_variable_placeholders": {"modus": "full"}},
+            "dynamic_variables": {"dynamic_variable_placeholders": {"modus": "full", "codewort": "Kürbiskern"}},
             "prompt": {
                 "prompt": prompt,
                 "built_in_tools": {"end_call": {"type": "system", "name": "end_call", "description": "",
@@ -989,7 +1051,7 @@ class Grabstein:
     def _start_talk(self, mode: str, manual: bool = False) -> bool:
         try:
             self.transcript.clear()
-            self.talk = Talk(mode, self.on_text)
+            self.talk = Talk(mode, self.on_text, self.settings.get()["codeword"])
             self.talk.manual = manual
             self.talk.start()
             self.state.add(datetime.now(), "talks")
@@ -1026,6 +1088,7 @@ class Grabstein:
         threading.Thread(target=_warm_up, daemon=True).start()
         threading.Thread(target=self._watch, daemon=True).start()
         self.sensors = sensors = Sensors()
+        leds = Leds()
         last_mode = ""
         signal.signal(signal.SIGTERM, lambda *_: self._stop.set())
         signal.signal(signal.SIGINT, lambda *_: self._stop.set())
@@ -1057,6 +1120,14 @@ class Grabstein:
             if mode != last_mode:
                 log(f"Modus: {mode}" + ("" if self.trusted else " (Uhrzeit noch nicht synchronisiert)"))
                 last_mode = mode
+            if not s["leds"]:
+                leds.show(Leds.OFF)
+            elif self.talk is not None:
+                leds.show(Leds.SINGLE, 0.12 + 0.88 * min(1.0, self.talk.audio.level))
+            elif self.player.playing():
+                leds.show(Leds.BREATH)
+            else:
+                leds.show(Leds.OFF)
             sensors.update()
             motion = sensors.motion()
             if motion:
@@ -1106,6 +1177,7 @@ class Grabstein:
         if self.talk is not None:
             self.talk.stop()
         self.player.stop()
+        leds.show(Leds.OFF)
         log("Grabstein beendet")
 
 
@@ -1160,7 +1232,7 @@ def cmd_reden() -> None:
     s = Settings(CFG["data_dir"] / "settings.json").get()
     set_volume(s["volume"])
     _warm_up()
-    t = Talk("full", lambda who, text: log(f"{who}: {text}") if s["transcripts"] else None)
+    t = Talk("full", lambda who, text: log(f"{who}: {text}") if s["transcripts"] else None, s["codeword"])
     t.start()
     print(f"Gespräch läuft höchstens {s['talk_max_s']} s (Strg+C beendet) …")
     try:

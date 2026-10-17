@@ -207,6 +207,7 @@ input[type=time], input[type=date] { color-scheme: dark; }
 .field:first-child { border-top: 0; padding-top: 0; }
 .field label { font-weight: 550; }
 .field .hint { display: block; color: var(--muted); font-size: .82rem; font-weight: 400; margin-top: 2px; }
+.field input.short { width: 140px; }
 .field input[type=number] { width: 96px; text-align: right; font-variant-numeric: tabular-nums; }
 .unit { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: .85rem; }
 .range { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }

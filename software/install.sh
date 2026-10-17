@@ -33,7 +33,7 @@ sudo mkdir -p /var/lib/grabstein && sudo chown "$ME:$ME" /var/lib/grabstein
 say "3/6 Python-Umgebung mit ElevenLabs-SDK"
 python3 -m venv --system-site-packages "$DEST/venv"
 "$DEST/venv/bin/pip" install -q --upgrade pip
-"$DEST/venv/bin/pip" install -q "elevenlabs==2.73.0"
+"$DEST/venv/bin/pip" install -q "elevenlabs==2.73.0" "pyusb==1.3.1"
 "$DEST/venv/bin/python" -c "import gpiozero, pyaudio, elevenlabs; print('Python-Module ok')"
 
 say "4/6 ReSpeaker als Standard-Audiogerät einrichten"
@@ -78,6 +78,10 @@ fi
 sudo chown "$ME:$ME" "$ETC/grabstein.env"
 sudo chmod 600 "$ETC/grabstein.env"
 sudo usermod -aG gpio,audio "$ME" || true
+# LED-Ring des ReSpeakers per USB steuern (Gruppe audio)
+echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="2886", ATTR{idProduct}=="001a", MODE="0660", GROUP="audio"' \
+  | sudo tee /etc/udev/rules.d/60-respeaker.rules >/dev/null
+sudo udevadm control --reload && sudo udevadm trigger --attr-match=idVendor=2886 || true
 # Dienst steuern und Herunterfahren aus der Web-Oberfläche ohne Passwort – nur diese Befehle
 echo "$ME ALL=(root) NOPASSWD: /usr/bin/systemctl restart grabstein, /usr/bin/systemctl stop grabstein, /usr/bin/systemctl start grabstein, /usr/bin/systemctl poweroff" \
   | sudo tee /etc/sudoers.d/grabstein >/dev/null
