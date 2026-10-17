@@ -42,33 +42,16 @@ if [ -z "$CARD" ]; then
   echo "!! ReSpeaker nicht gefunden. Ist er per USB angesteckt? Danach install.sh einfach nochmal starten."
 else
   echo "ReSpeaker gefunden: Karte '$CARD'"
-  # Variante A: Mikrofon nur Kanal 0 (aufbereitetes Signal mit Echounterdrückung)
-  sudo tee /etc/asound.conf >/dev/null <<EOF
-pcm.!default {
-  type asym
-  playback.pcm "grabstein_out"
-  capture.pcm "grabstein_in"
-}
-pcm.grabstein_out { type plug; slave.pcm "hw:$CARD,0" }
-pcm.grabstein_in { type plug; slave.pcm "grabstein_route" }
-pcm.grabstein_route {
-  type route
-  slave { pcm "hw:$CARD,0"; channels 2 }
-  ttable.0.0 1
-}
-ctl.!default { type hw; card $CARD }
-EOF
-  if ! arecord -q -D default -f S16_LE -r 16000 -c 1 -d 1 /tmp/grabstein-probe.wav 2>/dev/null; then
-    echo "Kanalwahl klappt nicht – nehme einfache Variante"
-    sudo tee /etc/asound.conf >/dev/null <<EOF
-pcm.!default { type plug; slave.pcm "hw:$CARD,0" }
-ctl.!default { type hw; card $CARD }
-EOF
-    arecord -q -D default -f S16_LE -r 16000 -c 1 -d 1 /tmp/grabstein-probe.wav \
-      && echo "Mikrofon ok" || echo "!! Mikrofon-Test fehlgeschlagen – bitte Ausgabe an Claude schicken"
-  else
+  # Mischer (dmix) + Musikregler, Mikrofon nur Kanal 0 – siehe asound.conf.vorlage
+  sed "s/@CARD@/$CARD/g" "$SRC/asound.conf.vorlage" | sudo tee /etc/asound.conf >/dev/null
+  # Das ReSpeaker-Mikrofon liefert nur bei laufender Wiedergabe – Stille dazu abspielen
+  timeout 4 aplay -q -D default -t raw -f S16_LE -r 16000 -c 1 /dev/zero 2>/dev/null &
+  if timeout 5 arecord -q -D default -f S16_LE -r 16000 -c 1 -d 1 /tmp/grabstein-probe.wav 2>/dev/null; then
     echo "Mikrofon ok"
+  else
+    echo "!! Mikrofon-Test fehlgeschlagen – bitte Ausgabe an Claude schicken"
   fi
+  wait
 fi
 
 say "5/6 Einstellungen"
