@@ -291,6 +291,54 @@ def music_generate(h, app):
     return {"ok": True}
 
 
+# ---------------------------------------------------------------- Spotify
+def _spotify(app):
+    if app.spotify is None:
+        raise ApiError("SPOTIFY_CLIENT_ID fehlt in /etc/grabstein/grabstein.env")
+    return app.spotify
+
+
+def _sp_call(fn, *args):
+    from spotify import SpotifyError
+    try:
+        return fn(*args)
+    except SpotifyError as e:
+        raise ApiError(str(e)) from None
+
+
+@route("GET", r"/api/spotify")
+def spotify_state(h, app):
+    sp = app.spotify
+    if sp is None:
+        return {"configured": False}
+    return {"configured": True, "connected": sp.connected, "device": sp.device_ok, "track": sp.track,
+            "playing": bool(sp.playing_uri), "error": sp.last_error, "playlist": app.settings.get()["spotify_playlist"]}
+
+
+@route("POST", r"/api/spotify/login")
+def spotify_login(h, app):
+    return {"url": _sp_call(_spotify(app).login_url)}
+
+
+@route("POST", r"/api/spotify/verbinden")
+def spotify_connect(h, app):
+    _sp_call(_spotify(app).finish_login, str(h.json().get("url", "")))
+    return {"ok": True}
+
+
+@route("POST", r"/api/spotify/trennen")
+def spotify_disconnect(h, app):
+    _spotify(app).disconnect()
+    return {"ok": True}
+
+
+@route("GET", r"/api/spotify/suche")
+def spotify_search(h, app):
+    q = (h.query.get("q") or [""])[0].strip()
+    sp = _spotify(app)
+    return {"playlists": _sp_call(sp.search, q) if q else _sp_call(sp.my_playlists)}
+
+
 # ---------------------------------------------------------------- Gustav
 @route("GET", r"/api/gustav")
 def gustav_get(h, app):

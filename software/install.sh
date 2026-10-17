@@ -22,7 +22,7 @@ sudo apt-get install -y -qq python3-lgpio >/dev/null 2>&1 || echo "(python3-lgpi
 
 say "2/6 Programm nach $DEST kopieren"
 sudo mkdir -p "$DEST" "$ETC"
-sudo cp "$SRC/grabstein.py" "$SRC/web.py" "$SRC/clips.json" "$SRC/agent_prompt.md" "$DEST/"
+sudo cp "$SRC/grabstein.py" "$SRC/web.py" "$SRC/spotify.py" "$SRC/clips.json" "$SRC/agent_prompt.md" "$DEST/"
 sudo rm -rf "$DEST/web" && sudo cp -r "$SRC/web" "$DEST/web"
 [ -d "$SRC/clips" ] && sudo cp -r "$SRC/clips" "$DEST/"
 sudo mkdir -p "$DEST/clips"/{approach,stay,leave,gentle}

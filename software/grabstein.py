@@ -68,6 +68,7 @@ CFG = {
     "data_dir": Path(env("DATA_DIR", "/var/lib/grabstein")),
     "web_port": env_int("WEB_PORT", 80),
     "web_pin": env("WEB_PIN", ""),
+    "spotify_client_id": env("SPOTIFY_CLIENT_ID", ""),
 }
 GROUPS = ("approach", "lure", "stay", "leave", "gentle")
 LURE_PAUSE_S = 20  # Abstand zwischen zwei Lockrufen, wenn jemand zu weit weg stehen bleibt
@@ -132,6 +133,7 @@ def default_settings() -> dict:
         "music_stream_url": "",
         "music_volume": 60,
         "music_duck": 25,
+        "spotify_playlist": None,
     }
 
 
@@ -179,6 +181,13 @@ def clean_setting(key: str, value):
         if value not in MUSIC_SOURCES:
             raise ValueError("Musikquelle unbekannt")
         return value
+    if key == "spotify_playlist":
+        if not value:
+            return None
+        uri = str(value.get("uri", ""))
+        if not re.fullmatch(r"spotify:playlist:\w{10,40}", uri):
+            raise ValueError("Ungültige Playlist")
+        return {"uri": uri, "name": str(value.get("name", ""))[:120], "image": str(value.get("image", ""))[:300]}
     if key == "music_stream_url":
         url = str(value or "").strip()
         if url and not re.fullmatch(r"https?://\S{4,500}", url):
@@ -748,8 +757,9 @@ class Music:
     Ein- und Ausblenden geschieht nur über den Regler, die Quelle läuft einfach weiter."""
     FADE_S = 2.0
 
-    def __init__(self, library: MusicLibrary) -> None:
+    def __init__(self, library: MusicLibrary, spotify=None) -> None:
         self.library = library
+        self.spotify = spotify
         self.proc: subprocess.Popen | None = None
         self.key: tuple | None = None       # was gerade läuft (Quelle, Adresse, Bibliotheksstand)
         self.retry_at = 0.0
@@ -805,6 +815,13 @@ class Music:
                 self.retry_at = mono + 10  # bricht ein Stream ab, frühestens in 10 s neu verbinden
         if fading_out:
             target = 0.0
+        if self.spotify is not None:
+            # Spotify spielt auf dem Gerät „Grabstein“; pausiert wird erst, wenn ausgeblendet ist
+            playlist = (s["spotify_playlist"] or {}).get("uri")
+            if s["music_on"] and active and s["music_source"] == "spotify" and playlist:
+                self.spotify.want = playlist
+            elif self.level <= 0:
+                self.spotify.want = None
         step = max(1.0, s["music_volume"] / (self.FADE_S * 10))
         self.level += max(-step, min(step, target - self.level))
         # Regler auch regelmäßig neu setzen: er entsteht erst, wenn das Gerät „musik“ zum ersten Mal
@@ -1227,7 +1244,11 @@ class Grabstein:
         self.gustav = Gustav(data / "gustav.json")
         self.player = ClipPlayer(self.clips)
         self.library = MusicLibrary(CFG["clips_dir"].parent / "musik")
-        self.music = Music(self.library)
+        self.spotify = None
+        if CFG["spotify_client_id"]:
+            from spotify import Spotify
+            self.spotify = Spotify(CFG["spotify_client_id"], data / "spotify.json")
+        self.music = Music(self.library, self.spotify)
         self.sensors: Sensors | None = None
         self.talk: Talk | None = None
         self.transcript: deque[dict] = deque(maxlen=60)

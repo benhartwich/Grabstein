@@ -545,7 +545,8 @@ VIEWS.musik = {
     const d = await run(() => api("GET", "/api/musik"));
     if (!d) return;
     this.data = d;
-    if (!$("#view-musik textarea:focus, #view-musik input[type=url]:focus")) this.render();
+    // nicht neu zeichnen, während jemand tippt oder Suchergebnisse ansieht
+    if (!$("#view-musik textarea:focus, #view-musik input:focus") && !$("#sp-results")?.childElementCount) this.render();
     if (S.tab === "musik") this.timer = setTimeout(() => this.load(), d.busy ? 3000 : 8000);
   },
   render() {
@@ -572,15 +573,7 @@ VIEWS.musik = {
             <form class="row" id="mu-url-form"><input type="url" id="mu-url" placeholder="https://… (MP3-Stream oder .m3u/.pls)" value="${esc(s.music_stream_url)}"><button class="btn primary">Speichern</button></form>
             <p class="small muted">Die meisten Internetradios bieten einen MP3-Stream an. AAC/HLS-Streams (.m3u8) spielt der Grabstein nicht.</p>
           </div>` : ""}
-          ${src === "spotify" ? `<div class="card">
-            <div class="card-head"><h2>Spotify</h2><span class="muted">Dienst: ${esc(d.spotify)}</span></div>
-            ${d.spotify === "active" ? `<ol class="steps">
-              <li>Spotify am Handy öffnen (im selben WLAN).</li>
-              <li>Unten auf das Gerätesymbol tippen und <b>„Grabstein“</b> wählen.</li>
-              <li>Deine Halloween-Playlist starten, Wiederholen einschalten.</li>
-              <li>Ein- und Ausblenden macht der Grabstein, die Spotify-Lautstärke bleibt auf voll.</li>
-            </ol>` : `<p class="muted small">Spotify Connect (raspotify) ist noch nicht eingerichtet – das macht ein einmaliges Skript.</p>`}
-          </div>` : ""}
+          ${src === "spotify" ? `<div class="card" id="sp-card"><p class="muted small">Lade Spotify …</p></div>` : ""}
         </div>
         <div class="stack">
           <div class="card">
@@ -603,6 +596,7 @@ VIEWS.musik = {
       </div>`;
     const v = $("#view-musik");
     bindFieldsOnce(v);
+    if (src === "spotify") this.spotify();
     $("#mu-src").onclick = (e) => { const b = e.target.closest("button"); if (b) saveSettings({ music_source: b.dataset.src }, "Quelle geändert").then(() => this.render()); };
     const slider = (id, key, label) => {
       const el = $(id), out = $(id + "-out");
@@ -632,6 +626,61 @@ VIEWS.musik = {
       this.load();
     });
   },
+};
+
+VIEWS.musik.spotify = async function () {
+  const card = $("#sp-card"); if (!card) return;
+  const sp = await api("GET", "/api/spotify").catch((e) => ({ error: e.message }));
+  if (!sp.configured) { card.innerHTML = `<h2>Spotify</h2><p class="muted small">SPOTIFY_CLIENT_ID fehlt in der env-Datei.</p>`; return; }
+  if (!sp.connected) {
+    card.innerHTML = `<h2>Spotify verbinden</h2>
+      <ol class="steps">
+        <li><button class="btn primary" id="sp-login">Mit Spotify anmelden</button></li>
+        <li>Bei Spotify bestätigen. Danach zeigt das Handy eine <b>Fehlerseite</b> (127.0.0.1) – das ist richtig so.</li>
+        <li>Die <b>Adresse dieser Fehlerseite</b> kopieren und hier einfügen:</li>
+      </ol>
+      <form class="row" id="sp-form"><input type="url" id="sp-url" placeholder="http://127.0.0.1:8888/callback?code=…"><button class="btn primary">Verbinden</button></form>`;
+    $("#sp-login").onclick = async () => {
+      const r = await run(() => api("POST", "/api/spotify/login"));
+      if (r) window.open(r.url, "_blank");
+    };
+    $("#sp-form").onsubmit = async (e) => {
+      e.preventDefault();
+      if (await run(() => api("POST", "/api/spotify/verbinden", { url: $("#sp-url").value }), "Spotify verbunden")) VIEWS.musik.spotify();
+    };
+    return;
+  }
+  const pl = sp.playlist;
+  card.innerHTML = `
+    <div class="card-head"><h2>Spotify</h2><span class="muted">${sp.device ? "Gerät „Grabstein“ bereit" : "Gerät nicht gefunden"}</span></div>
+    ${sp.device ? "" : `<p class="small muted">Einmal in der Spotify-App unten aufs Gerätesymbol tippen und „Grabstein“ wählen – danach findet der Grabstein sich selbst.</p>`}
+    ${sp.error ? `<p class="small" style="color:var(--danger)">${esc(sp.error)}</p>` : ""}
+    <div class="track"><div><div class="sub">Gewählte Playlist</div><div class="name">${pl ? esc(pl.name) : "– noch keine –"}</div>
+      ${sp.track ? `<div class="sub">♪ ${esc(sp.track)}</div>` : ""}</div>
+      ${pl && pl.image ? `<img src="${esc(pl.image)}" alt="" width="56" height="56" style="border-radius:8px">` : ""}</div>
+    <p class="small muted">Startet von selbst (zufällig, wiederholt), sobald der Grabstein aktiv ist und Musik an ist – und pausiert danach.</p>
+    <form class="row" id="sp-search"><input type="text" id="sp-q" placeholder="Playlist suchen, z. B. Halloween" autocomplete="off"><button class="btn">Suchen</button></form>
+    <button class="btn ghost" id="sp-mine">Meine Playlists</button>
+    <div id="sp-results"></div>
+    <button class="btn ghost" id="sp-off" style="justify-self:start">Spotify trennen</button>`;
+  const show = async (q) => {
+    const box = $("#sp-results");
+    box.innerHTML = `<p class="small muted"><span class="spin"></span> Suche …</p>`;
+    const r = await run(() => api("GET", `/api/spotify/suche?q=${encodeURIComponent(q)}`));
+    if (!r) { box.innerHTML = ""; return; }
+    box.innerHTML = r.playlists.map((p, i) => `<div class="track">
+        <div class="row" style="gap:10px">${p.image ? `<img src="${esc(p.image)}" alt="" width="44" height="44" style="border-radius:6px;flex:none">` : ""}
+          <div><div class="name">${esc(p.name)}</div><div class="sub">${esc(p.owner)}${p.tracks ? ` · ${p.tracks} Titel` : ""}</div></div></div>
+        <button class="btn" data-i="${i}">Wählen</button></div>`).join("") || `<p class="empty">Nichts gefunden.</p>`;
+    box.querySelectorAll("[data-i]").forEach((b) => b.onclick = async () => {
+      const p = r.playlists[b.dataset.i];
+      await saveSettings({ spotify_playlist: { uri: p.uri, name: p.name, image: p.image } }, `„${p.name}“ gewählt`);
+      VIEWS.musik.spotify();
+    });
+  };
+  $("#sp-search").onsubmit = (e) => { e.preventDefault(); const q = $("#sp-q").value.trim(); if (q) show(q); };
+  $("#sp-mine").onclick = () => show("");
+  $("#sp-off").onclick = async () => { if (confirm("Verbindung zu Spotify trennen?")) { await run(() => api("POST", "/api/spotify/trennen")); VIEWS.musik.spotify(); } };
 };
 
 // ---------------------------------------------------------------- Gustav
