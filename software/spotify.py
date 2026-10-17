@@ -137,7 +137,8 @@ class Spotify:
                 "image": images[-1]["url"] if images else ""}
 
     def search(self, q: str) -> list[dict]:
-        data = self._api("GET", "/search", {"q": q, "type": "playlist", "limit": 15})
+        # mehr als 10 Ergebnisse lässt Spotify bei der Suche nicht zu
+        data = self._api("GET", "/search", {"q": q, "type": "playlist", "limit": 10})
         return [self._playlist(p) for p in (data.get("playlists") or {}).get("items") or [] if p]
 
     def my_playlists(self) -> list[dict]:
