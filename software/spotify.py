@@ -118,7 +118,10 @@ class Spotify:
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
                 raw = r.read()
-                return json.loads(raw) if raw else None
+                try:
+                    return json.loads(raw) if raw else None
+                except ValueError:  # manche Steuerbefehle antworten mit leerem oder Klartext-Rumpf
+                    return None
         except urllib.error.HTTPError as e:
             msg = e.read().decode()[:200]
             try:
