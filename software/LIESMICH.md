@@ -20,14 +20,26 @@ Andere Pins? In `/etc/grabstein/grabstein.env` bei `PIR_PIN` und `RADAR_PIN` die
 5. Testen: `grabstein sensoren`, `grabstein ton`, `grabstein reden`
 6. `sudo systemctl start grabstein` – ab jetzt startet der Grabstein bei jedem Einschalten von selbst.
 
+## Web-Oberfläche
+
+Im Heimnetz unter **http://grabstein.local** (am Handy: „Zum Startbildschirm hinzufügen“). Dort:
+
+- **Start:** Zustand, Betriebsart (Automatik / Aus / Lieb / Gruselig, auf Wunsch befristet), Sensoren live, Clips und Gespräch auslösen, Durchsage mit Gustavs Stimme, Zähler des Abends
+- **Zeitplan:** Einträge für Wochentage oder ein bestimmtes Datum, mit Wochenvorschau
+- **Clips:** Texte bearbeiten, neu erzeugen, an-/ausschalten, am Grabstein oder am Handy anhören, eigene MP3s hochladen
+- **Gustav:** Gesprächs-Einstellungen, Prompt und erste Nachricht – direkt zu ElevenLabs übertragen
+- **Mehr:** Erkennungszeiten, Lautstärke, Systemzustand (WLAN, Temperatur), Verlauf, Protokoll, Neustart
+
+Einstellungen aus der Oberfläche liegen in `/var/lib/grabstein/` und wirken sofort. Optional schützt `WEB_PIN=` in der env-Datei die Oberfläche mit einer PIN.
+
 ## Was der Grabstein tut
 
 - **Jemand kommt** (Bewegungsmelder): kurzer Flüster-Clip aus `approach`.
 - **Jemand bleibt stehen** (Radar ≥ 4 s): Gespräch mit dem ElevenLabs-Agenten, höchstens 90 s.
 - **Jemand geht** (Radar 8 s frei): Gespräch endet.
-- **Kinder-Modus** bis 19:30 (und immer, solange die Uhrzeit nicht synchronisiert ist): nur liebe Clips aus `gentle`, kein Gespräch.
+- **Lieb** (Standard bis 19:30, und immer, solange die Uhrzeit nicht synchronisiert ist): nur liebe Clips aus `gentle`; Gespräche nur, wenn unter „Gustav“ erlaubt.
 - **Ohne Internet** oder wenn das Abendbudget (20 min) verbraucht ist: Clips statt Gespräch.
-- Außerhalb 16:30–22:30 ist der Grabstein still.
+- Außerhalb des Zeitplans (Standard 16:30–22:30) ist der Grabstein still.
 
 ## Nützliche Befehle
 
@@ -35,7 +47,7 @@ Andere Pins? In `/etc/grabstein/grabstein.env` bei `PIR_PIN` und `RADAR_PIN` die
 |---|---|
 | `grabstein status` | Modus, Budget, Clips, Internet |
 | `journalctl -u grabstein -f` | Live-Log |
-| `sudo systemctl restart grabstein` | nach Änderungen an den Einstellungen |
+| `sudo systemctl restart grabstein` | nach Änderungen an der env-Datei |
 | `grabstein clips --neu` | Clips neu erzeugen (z. B. nach Stimmenwechsel) |
 
 Den ElevenLabs-Agenten richtest du nach `agent_prompt.md` ein.

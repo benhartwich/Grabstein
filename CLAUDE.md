@@ -24,28 +24,31 @@ Halloween-Deko von Benjamin: 3D-gedruckter Grabstein (Snapmaker U1) mit Raspberr
 | Pfad | Inhalt |
 |---|---|
 | `~/grabstein-repo` | dieses Repo (Quelle der Wahrheit) |
-| `software/` | `grabstein.py`, `install.sh`, `clips.json`, `agent_prompt.md`, `grabstein.env.example` |
+| `software/` | `grabstein.py` (Kern + CLI), `web.py` (HTTP-API, nur stdlib), `web/` (Oberfläche, Vanilla-JS), `install.sh`, `clips.json`/`agent_prompt.md` (nur Vorlagen für den ersten Start), `grabstein.env.example` |
 | `gehaeuse/` | CAD (Python/manifold3d), STL, Orca-Projekte – auf dem Pi nur Ablage |
 | `/opt/grabstein` | installierte Software + venv (`elevenlabs==2.73.0`), Clips in `/opt/grabstein/clips/` |
-| `/etc/grabstein/grabstein.env` | Einstellungen und Schlüssel (chmod 600) |
+| `/etc/grabstein/grabstein.env` | nur Schlüssel, Agent/Voice-ID, Modelle, Pins, `WEB_PORT`, `WEB_PIN` (chmod 600) |
+| `/var/lib/grabstein/` | `settings.json` (Zeitplan, Betriebsart, Zeiten, Lautstärke – über das Web änderbar, wirkt sofort), `clips.json` (Clip-Texte/Schalter), `gustav.json` (Prompt), `state.json` (Zähler/Budget pro Abend) |
 | `/usr/local/bin/grabstein` | Wrapper; hält für Testbefehle den Dienst an |
 | `grabstein.service` | systemd-Dienst (User ben, Gruppen gpio audio) |
 | `/etc/asound.conf` | ReSpeaker als Standardgerät, Aufnahme Kanal 0 |
 
-Befehle: `grabstein run | sensoren | ton | reden | clips [--neu] | status | agent`, Log: `journalctl -u grabstein -f`.
+Web-Oberfläche: **http://grabstein.local** (Port 80, im Dienst als Thread). Befehle: `grabstein run | sensoren | ton | reden | clips [--neu] | status | agent` – der Wrapper hält den Dienst für Tests an und startet ihn danach wieder. Log: `journalctl -u grabstein -f`.
+
+**Audio-Eigenheit ReSpeaker:** Aufnahme und Wiedergabe sind gekoppelt – das Mikrofon liefert nur, solange gleichzeitig abgespielt wird. Gespräche laufen deshalb über `arecord`/`aplay` mit Stille-Strom (PortAudio hing außerdem beim Stoppen). Für UI-Tests ist `chromium` installiert (headless Screenshots / DevTools).
 
 Modelle: Clips `eleven_v4`, Agent `eleven_v4_turbo` (beides bestätigt: Stimme passt).
 
 ## Verhalten (Kurzfassung)
 
-Hauptschleife alle 0,1 s. Laufende Clips werden nie unterbrochen, Auslösungen währenddessen verfallen. Clip-Pause 45 s, Gesprächs-Pause 120 s, Gespräch max. 90 s, Ende nach 8 s Radar frei, Budget 20 min/Abend, aktiv 16:30–22:30, bis 19:30 und ohne Zeitsync nur „gentle“-Clips.
+Hauptschleife alle 0,1 s; Web-Befehle laufen über eine Queue in die Schleife. Laufende Clips werden nie unterbrochen, Auslösungen währenddessen verfallen. Modus kommt aus Betriebsart (Automatik/Aus/Lieb/Gruselig, optional befristet) bzw. Zeitplan (Wochentags- und Datums-Einträge; Datum ersetzt an dem Tag die Wochentage; bei Überschneidung gewinnt aus > gruselig > lieb). Ohne Zeitsync im Automatik-Betrieb nur „lieb“. Standard: Clip-Pause 45 s, Gesprächs-Pause 120 s, Gespräch max. 90 s, Ende nach 8 s Radar frei, Budget 20 min/Abend, 16:30–19:30 lieb, 19:30–22:30 gruselig. Von Hand gestartete Gespräche ignorieren das Radar.
 
-## Offene Aufgaben (der Reihe nach)
+## Offene Aufgaben
 
-1. **`grabstein reden` hängt bei Strg+C** (und bei SIGINT/SIGTERM) – Gespräch sauber beenden.
-2. **Wrapper `/usr/local/bin/grabstein`** startet den Dienst nach Tests nicht wieder – per `trap` neu starten. Außerdem hängt `grabstein ton` nach dem Testton (Aufnahme-Schritt prüfen).
+1. **Mikrofon-Pegel prüfen:** Aufnahme läuft seit dem Stille-Fix, Pegel aber niedrig (Spitze ~850). Mit Transkript-Anzeige ein echtes Gespräch testen; ggf. Verstärkung per `xvf_host` (AGC) anheben.
+2. **Sensoren verkabeln** und unter „Start → Live“ prüfen; danach `Stehenbleiben ab`/`Weg nach` einstellen.
 3. **Optional Latenz weiter senken:** Signed-URL vorab holen und kurz cachen (erste Antwort derzeit 1,6 s).
 
-Erledigt (17.10.): GitHub (`benhartwich/Grabstein`), neue grabstein.py ausgerollt (lgpio braucht beschreibbares Arbeitsverzeichnis → `/run/grabstein` in der Unit), Lautsprecher an JST-Buchse läuft ohne Verstärker-Enable, `LAUTSTAERKE=100` (0 dB, Stimme passt, klirrt nicht).
+Erledigt (17.10.): GitHub (`benhartwich/Grabstein`), lgpio-Arbeitsverzeichnis, Lautsprecher an JST ohne Verstärker-Enable, `LAUTSTAERKE=100`, Web-Oberfläche, hängendes Gesprächsende (PortAudio) und taubes Mikrofon (SYNC-Kopplung) behoben, Wrapper startet Dienst nach Tests neu.
 
 Nach jeder Änderung: committen und pushen.

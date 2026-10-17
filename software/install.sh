@@ -22,10 +22,13 @@ sudo apt-get install -y -qq python3-lgpio >/dev/null 2>&1 || echo "(python3-lgpi
 
 say "2/6 Programm nach $DEST kopieren"
 sudo mkdir -p "$DEST" "$ETC"
-sudo cp "$SRC/grabstein.py" "$SRC/clips.json" "$SRC/agent_prompt.md" "$DEST/"
+sudo cp "$SRC/grabstein.py" "$SRC/web.py" "$SRC/clips.json" "$SRC/agent_prompt.md" "$DEST/"
+sudo rm -rf "$DEST/web" && sudo cp -r "$SRC/web" "$DEST/web"
 [ -d "$SRC/clips" ] && sudo cp -r "$SRC/clips" "$DEST/"
 sudo mkdir -p "$DEST/clips"/{approach,stay,leave,gentle}
 sudo chown -R "$ME:$ME" "$DEST"
+# Einstellungen, Zeitplan, Clip-Texte und Zähler aus der Web-Oberfläche
+sudo mkdir -p /var/lib/grabstein && sudo chown "$ME:$ME" /var/lib/grabstein
 
 say "3/6 Python-Umgebung mit ElevenLabs-SDK"
 python3 -m venv --system-site-packages "$DEST/venv"
@@ -78,13 +81,17 @@ sudo usermod -aG gpio,audio "$ME" || true
 
 sudo tee /usr/local/bin/grabstein >/dev/null <<'EOF'
 #!/usr/bin/env bash
-# Startet Testbefehle; hält dafür den Dienst kurz an (GPIO und Audio sind sonst belegt).
-if [ "${1:-run}" != "run" ] && [ "${1:-}" != "status" ] && systemctl is-active --quiet grabstein; then
-  echo "Dienst wird für den Test angehalten (danach: sudo systemctl start grabstein)"
-  sudo systemctl stop grabstein
-fi
+# Startet Testbefehle; hält dafür den Dienst kurz an (GPIO und Audio sind sonst belegt)
+# und startet ihn danach wieder.
 set -a; . /etc/grabstein/grabstein.env; set +a
-exec /opt/grabstein/venv/bin/python /opt/grabstein/grabstein.py "$@"
+PY=(/opt/grabstein/venv/bin/python /opt/grabstein/grabstein.py "$@")
+case "${1:-run}" in run|status|agent) exec "${PY[@]}" ;; esac
+if systemctl is-active --quiet grabstein; then
+  echo "Dienst wird für den Test angehalten und danach wieder gestartet"
+  sudo systemctl stop grabstein
+  trap 'sudo systemctl start grabstein' EXIT
+fi
+"${PY[@]}"
 EOF
 sudo chmod 755 /usr/local/bin/grabstein
 
@@ -104,6 +111,9 @@ EnvironmentFile=$ETC/grabstein.env
 RuntimeDirectory=grabstein
 WorkingDirectory=/run/grabstein
 Environment=LG_WD=/run/grabstein
+StateDirectory=grabstein
+# Web-Oberfläche auf Port 80
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 ExecStart=$DEST/venv/bin/python $DEST/grabstein.py run
 Restart=always
 RestartSec=5
@@ -123,5 +133,6 @@ Nächste Schritte:
   4. Ton und Mikro testen:    grabstein ton
   5. Gespräch testen:         grabstein reden
   6. Dienst starten:          sudo systemctl start grabstein
+     Web-Oberfläche:          http://$(hostname).local
      Log ansehen:             journalctl -u grabstein -f
 EOF
