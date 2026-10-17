@@ -351,6 +351,25 @@ def set_volume(percent: int) -> None:
         log(f"Lautstärke nicht gesetzt: {e}")
 
 
+def tone_file() -> Path:
+    """Leiser Testton (1 s, 440 Hz, etwa -16 dB) – speaker-test spielt mit vollem Pegel und zu lange."""
+    import math
+    import wave
+    f = Path("/tmp/grabstein-ton.wav")
+    if not f.exists():
+        rate = 16000
+        frames = bytearray()
+        for i in range(rate):
+            fade = min(1.0, i / 800, (rate - i) / 800)  # weich ein- und ausblenden
+            frames += int(5000 * fade * math.sin(2 * math.pi * 440 * i / rate)).to_bytes(2, "little", signed=True)
+        with wave.open(str(f), "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(rate)
+            w.writeframes(bytes(frames))
+    return f
+
+
 CLIP_ID = re.compile(r"[\w-]{1,40}")
 
 
@@ -912,7 +931,7 @@ class Grabstein:
     def _cmd_tone(self) -> tuple[bool, str]:
         if self.talk is not None:
             return False, "Gerade läuft ein Gespräch"
-        self.player.play_cmd(["speaker-test", "-t", "sine", "-f", "440", "-l", "1", "-s", "1"], "Testton")
+        self.player.play_file(tone_file(), "Testton")
         return True, "Testton läuft"
 
     def _cmd_talk(self) -> tuple[bool, str]:
@@ -1080,8 +1099,7 @@ def cmd_sensoren() -> None:
 def cmd_ton() -> None:
     set_volume(Settings(CFG["data_dir"] / "settings.json").get()["volume"])
     print("1) Testton über den Lautsprecher …", flush=True)
-    subprocess.run(["speaker-test", "-t", "sine", "-f", "440", "-l", "1", "-s", "1"],
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+    subprocess.run(["aplay", "-q", str(tone_file())], timeout=15)
     print("2) Sprich jetzt 4 Sekunden lang ins Mikrofon …", flush=True)
     wav = Path("/tmp/grabstein-test.wav")
     # Das ReSpeaker-Mikrofon liefert nur, solange die Wiedergabe läuft: Stille dazu abspielen.
