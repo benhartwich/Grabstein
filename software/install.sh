@@ -78,6 +78,10 @@ fi
 sudo chown "$ME:$ME" "$ETC/grabstein.env"
 sudo chmod 600 "$ETC/grabstein.env"
 sudo usermod -aG gpio,audio "$ME" || true
+# Dienst steuern und Herunterfahren aus der Web-Oberfläche ohne Passwort – nur diese Befehle
+echo "$ME ALL=(root) NOPASSWD: /usr/bin/systemctl restart grabstein, /usr/bin/systemctl stop grabstein, /usr/bin/systemctl start grabstein, /usr/bin/systemctl poweroff" \
+  | sudo tee /etc/sudoers.d/grabstein >/dev/null
+sudo chmod 440 /etc/sudoers.d/grabstein
 
 sudo tee /usr/local/bin/grabstein >/dev/null <<'EOF'
 #!/usr/bin/env bash
