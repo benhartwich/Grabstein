@@ -108,7 +108,7 @@ td.mono { font-family: var(--font-mono); white-space: nowrap; }
     <ul class="status" style="margin-bottom: 18px">
       <li>Pi-Seite gemessen: nur GPIO17 und GPIO22 werden von außen auf „high“ gezogen, die Nachbar-Pins bleiben „low“.</li>
       <li>Radar laut Hersteller-Datenblatt: grau VCC, weiß GND, schwarz OUT – keine Datenflanken auf GPIO22, also wirklich OUT.</li>
-      <li>Bewegungsmelder schaltet (08:39 aus und wieder an).</li>
+      <li>Bewegungsmelder schaltet (gemessen mehrfach zwischen 08:39 und 08:45).</li>
       <li>Radar meldet dauerhaft „jemand da“, solange jemand im Raum ist – es erkennt auch Atmen bis ca. 5 m.</li>
     </ul>
     <div class="views">
@@ -223,21 +223,38 @@ td.mono { font-family: var(--font-mono); white-space: nowrap; }
         </div>
         <div class="view">
           <h3>3 · Bewegungsmelder HC-SR501</h3>
-          <p class="from">Blick <b>von der Seite mit der Kuppel</b>, Stifte oben. Die Beschriftung steht unter der abziehbaren Kuppel; je nach Exemplar sind VCC und GND gespiegelt – der Melder schaltet bei dir, also passt es.</p>
-          <svg viewBox="0 0 460 315" role="img" aria-label="Bewegungsmelder HC-SR501 mit drei gesteckten Kabeln">
-<rect x="80" y="150" width="300" height="130" rx="10" style="fill: #2a7a3f"/>
-<circle cx="230" cy="215" r="48" style="fill: #f1f1ee; stroke: #d0d0cc"/>
-<text x="230" y="219" text-anchor="middle" style="fill:#6a6a66; font-size:12px">Kuppel</text>
+          <p class="from">Blick auf die <b>Bauteilseite</b> (Kuppel zeigt von dir weg), <b>Stifte oben</b>, die zwei Drehregler unten. Von links: <b>braun GND – rot OUT – orange VCC</b>. VCC erkennst du an der kleinen roten Diode und dem dreibeinigen Regler rechts daneben. Von der Kuppelseite aus gesehen ist es gespiegelt.</p>
+          <ul class="checks" style="font-size:.88rem">
+            <li><strong>Haltezeit</strong> (rechter Regler) ganz nach links: ca. 3 s. Die Pausen macht das Programm selbst.</li>
+            <li><strong>Reichweite</strong> (linker Regler) erstmal in der Mitte. Gelben Jumper so lassen.</li>
+            <li>Bleibt er nach dem Drehen ewig an, sind die Regler bei deinem Exemplar vertauscht – dann den anderen nehmen.</li>
+          </ul>
+          <svg viewBox="0 0 460 400" role="img" aria-label="Bewegungsmelder HC-SR501 von der Bauteilseite mit drei gesteckten Kabeln">
+<rect x="70" y="150" width="320" height="200" rx="10" style="fill: #1d5f6b"/>
+<rect x="92" y="190" width="40" height="90" rx="4" style="fill: #1b1b1b"/>
+<text x="112" y="300" text-anchor="middle" style="fill:#d7eef1; font-size:10px">Chip</text>
+<rect x="306" y="168" width="22" height="9" rx="4" style="fill: #d8322f"/>
+<text x="317" y="194" text-anchor="middle" style="fill:#d7eef1; font-size:10px">Diode</text>
+<rect x="300" y="206" width="40" height="24" rx="3" style="fill: #1b1b1b"/>
+<text x="320" y="246" text-anchor="middle" style="fill:#d7eef1; font-size:10px">Regler</text>
+<rect x="156" y="290" width="48" height="48" rx="4" style="fill: #111"/><circle cx="180" cy="314" r="11" style="fill: #e3a72f"/>
+<text x="180" y="372" text-anchor="middle" class="t-muted">Reichweite</text>
+<rect x="246" y="290" width="48" height="48" rx="4" style="fill: #111"/><circle cx="270" cy="314" r="11" style="fill: #e3a72f"/>
+<text x="270" y="372" text-anchor="middle" class="t-muted">Haltezeit</text>
+<rect x="86" y="300" width="20" height="34" rx="3" style="fill: #f2c318"/>
+<text x="96" y="372" text-anchor="middle" class="t-muted">Jumper</text>
 <rect x="183" y="146" width="14" height="14" style="fill: #111"/>
-<path d="M190 146 V30" class="wire-o"/><path d="M190 146 V30" class="wire" style="stroke: var(--k-orange)"/>
-<text x="202" y="34" class="t-wire"><tspan font-weight="600">orange</tspan> VCC → Pin 2</text>
+<text x="190" y="178" text-anchor="middle" style="fill:#ffffff; font-family: var(--font-mono); font-size:11px; font-weight:600">GND</text>
+<path d="M190 146 V30" class="wire-o"/><path d="M190 146 V30" class="wire" style="stroke: var(--k-brown)"/>
+<text x="202" y="34" class="t-wire"><tspan font-weight="600">braun</tspan> GND → Pin 6</text>
 <rect x="223" y="146" width="14" height="14" style="fill: #111"/>
+<text x="230" y="178" text-anchor="middle" style="fill:#ffffff; font-family: var(--font-mono); font-size:11px; font-weight:600">OUT</text>
 <path d="M230 146 V60" class="wire-o"/><path d="M230 146 V60" class="wire" style="stroke: var(--k-red)"/>
 <text x="242" y="64" class="t-wire"><tspan font-weight="600">rot</tspan> OUT → Pin 11</text>
 <rect x="263" y="146" width="14" height="14" style="fill: #111"/>
-<path d="M270 146 V90" class="wire-o"/><path d="M270 146 V90" class="wire" style="stroke: var(--k-brown)"/>
-<text x="282" y="94" class="t-wire"><tspan font-weight="600">braun</tspan> GND → Pin 6</text>
-<text x="230" y="306" text-anchor="middle" class="t-muted">OUT ist immer der mittlere Stift</text>
+<text x="270" y="178" text-anchor="middle" style="fill:#ffffff; font-family: var(--font-mono); font-size:11px; font-weight:600">VCC</text>
+<path d="M270 146 V90" class="wire-o"/><path d="M270 146 V90" class="wire" style="stroke: var(--k-orange)"/>
+<text x="282" y="94" class="t-wire"><tspan font-weight="600">orange</tspan> VCC → Pin 2</text>
 </svg>
         </div>
       </div>
@@ -487,7 +504,7 @@ td.mono { font-family: var(--font-mono); white-space: nowrap; }
       <h2>Vor dem Einschalten prüfen</h2>
       <ol class="checks">
         <li><strong>Pin 1 finden:</strong> Er liegt an dem Ende der Leiste, das von den USB-Buchsen wegzeigt, in der inneren Reihe. Die äußere Reihe (Platinenrand) hat die geraden Nummern.</li>
-        <li><strong>Beschriftung auf den Sensoren lesen:</strong> Die Pin-Reihenfolge ist nicht bei allen Exemplaren gleich. Beim HC-SR501 stehen VCC, OUT und GND unter der abziehbaren Linse, beim Radar auf der Antennenseite (TX RX OUT GND VCC, von der Bauteilseite gesehen gespiegelt). Es zählt der Aufdruck, nicht die Position im Bild.</li>
+        <li><strong>Beschriftung auf den Sensoren lesen:</strong> Die Pin-Reihenfolge ist nicht bei allen Exemplaren gleich. Beim HC-SR501 ist OUT immer in der Mitte, VCC auf der Seite mit Diode und Spannungsregler (Beschriftung unter der abziehbaren Kuppel), beim Radar auf der Antennenseite (TX RX OUT GND VCC, von der Bauteilseite gesehen gespiegelt). Es zählt der Aufdruck, nicht die Position im Bild.</li>
         <li><strong>5 V nie an OUT:</strong> Ein vertauschtes Kabel an einem GPIO-Pin kann den Pi beschädigen. Vor dem Einschalten jede Leitung einmal mit der Tabelle vergleichen.</li>
         <li><strong>Ton immer über den ReSpeaker:</strong> Die Klinke am Pi bleibt frei. Nur so funktioniert die Echounterdrückung.</li>
         <li><strong>Lautsprecher an die JST-Buchse:</strong> Der Verstärker sitzt auf dem ReSpeaker und wird über dessen USB-Kabel vom Pi versorgt. Der Stecker passt nur in einer Richtung. Rot und schwarz sind bei einem Lautsprecher egal.</li>
