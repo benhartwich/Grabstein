@@ -18,7 +18,9 @@ const GROUP = {
   approach: { title: "Vorbeigehen", hint: "Kurz – wenn der Bewegungsmelder jemanden sieht." },
   lure: { title: "Anlocken", hint: "Wenn jemand stehen bleibt, aber weiter weg ist als der Gesprächsabstand." },
   stay: { title: "Stehenbleiben", hint: "Statt eines Gesprächs, z. B. ohne Internet oder wenn das Budget leer ist." },
-  leave: { title: "Abschied", hint: "Nach Zeitlimit oder leerem Budget." },
+  leave: { title: "Abschied", hint: "Wenn Gustav sich nach Zeitlimit oder leerem Budget nicht selbst verabschiedet hat." },
+  sleep: { title: "Einschlafen", hint: "Nach jedem Gespräch – damit man hört, dass Gustav wieder schläft." },
+  silent: { title: "Keine Antwort", hint: "Wenn niemand mehr antwortet oder alle gegangen sind." },
   gentle: { title: "Lieb", hint: "Kinder-Modus – freundlich, nicht gruselig." },
 };
 const DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
@@ -243,8 +245,8 @@ VIEWS.start = {
     $("#stats").innerHTML = [
       [t.motion, "Bewegungen"], [t.stays, "Geblieben"], [t.clips, "Clips"], [t.talks, "Gespräche"],
     ].map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join("");
-    $("#budget-txt").textContent = `${t.talk_min.toLocaleString("de-AT")} / ${t.budget_min} min`;
-    $("#budget-bar").style.width = `${Math.min(100, (t.talk_min / Math.max(1, t.budget_min)) * 100)}%`;
+    $("#budget-txt").textContent = `${t.talk_min.toLocaleString("de-AT")} / ${t.budget_min ? `${t.budget_min} min` : "ohne Limit"}`;
+    $("#budget-bar").style.width = t.budget_min ? `${Math.min(100, (t.talk_min / t.budget_min) * 100)}%` : "0";
 
     $("#events").innerHTML = st.log.slice().reverse().map((l) => `<li><time>${esc(l.hm)}</time><span>${esc(l.msg)}</span></li>`).join("")
       || `<li class="empty">Noch nichts passiert.</li>`;
@@ -707,7 +709,7 @@ VIEWS.gustav = {
               ${fieldSwitch("live_agent", "Live-Gespräche", "Aus = Gustav spielt nur Clips.", s)}
               ${fieldSwitch("talk_gentle", "Auch im lieben Modus", "Gustav redet dann freundlich statt gruselig.", s)}
               ${fieldNumber("talk_max_s", "Höchstdauer", "Danach verabschiedet er sich.", "s", s)}
-              ${fieldNumber("talk_budget_min", "Budget pro Abend", "Kostenbremse für ElevenLabs.", "min", s)}
+              ${fieldNumber("talk_budget_min", "Budget pro Abend", "Kostenbremse für ElevenLabs. 0 = ohne Limit.", "min", s)}
               ${fieldSwitch("transcripts", "Mitschrift anzeigen", "Nur im Arbeitsspeicher, weg nach Neustart.", s)}
               ${fieldText("codeword", "Rätsel-Codewort", "Verrät Gustav nach einem gelösten Rätsel – wer es an der Tür sagt, bekommt ein Extra-Zuckerl.", s)}
             </div>

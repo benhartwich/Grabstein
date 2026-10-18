@@ -70,7 +70,7 @@ CFG = {
     "web_pin": env("WEB_PIN", ""),
     "spotify_client_id": env("SPOTIFY_CLIENT_ID", ""),
 }
-GROUPS = ("approach", "lure", "stay", "leave", "gentle")
+GROUPS = ("approach", "lure", "stay", "leave", "sleep", "silent", "gentle")
 LURE_PAUSE_S = 20  # Abstand zwischen zwei Lockrufen, wenn jemand zu weit weg stehen bleibt
 MODES = ("off", "gentle", "full", "music")  # music = nur Hintergrundmusik, Sensoren ruhen
 LOG: deque[tuple[float, str]] = deque(maxlen=500)
@@ -351,6 +351,8 @@ class State:
         return float(self.today(now)["talk_s"])
 
     def left(self, now: datetime, budget_min: int) -> float:
+        if budget_min <= 0:  # 0 = ohne Limit
+            return float("inf")
         return max(0.0, budget_min * 60 - self.used(now))
 
     def add(self, now: datetime, key: str, amount: float = 1) -> None:
@@ -467,8 +469,11 @@ class Clips:
         except (OSError, ValueError) as e:
             log(f"Clip-Katalog nicht lesbar ({e}) – lege ihn neu an")
             self.data = self._seed()
-        for g in GROUPS:
-            self.data.setdefault(g, [])
+        missing = [g for g in GROUPS if g not in self.data]
+        if missing:  # neue Gruppe in einer neueren Version: Vorlagetexte übernehmen
+            seed = self._seed()
+            for g in missing:
+                self.data[g] = seed[g]
         self._scan()
         self._save()
 
@@ -869,7 +874,7 @@ def _rms(pcm: bytes) -> float:
 
 
 WRAP_UP = ("ZEIT UM: Antworte noch kurz auf das, was der Besuch gerade gesagt hat. Ist ein Rätsel offen, "
-           "verrate jetzt die Lösung. Verabschiede dich dann in einem Satz und beende das Gespräch "
+           "verrate jetzt die Lösung. Verabschiede dich dann in einem Satz – sag dabei, dass du jetzt wieder schlafen gehst – und beende das Gespräch "
            "sofort mit dem Werkzeug end_call.")
 WRAP_GRACE_S = 30  # so lange darf die Verabschiedung dauern, dann wird hart beendet
 # Ohne "interruption": Gustav spricht jeden Satz zu Ende. Sonst hält er sein eigenes Echo
@@ -992,6 +997,8 @@ class Talk:
         key = CFG["api_key"] or None
         client = ElevenLabs(api_key=key)
         say = on_text or (lambda who, text: None)
+        self._say = say
+        self.last_heard = self.started
         self.conv = Conversation(
             client,
             CFG["agent_id"],
@@ -999,9 +1006,16 @@ class Talk:
             audio_interface=self.audio,
             config=ConversationInitiationData(dynamic_variables={"modus": mode, "codewort": codeword}),
             callback_agent_response=lambda t: say("Gustav", t),
-            callback_user_transcript=lambda t: say("Besuch", t),
+            callback_user_transcript=self._heard,
             callback_end_session=self.ended.set,
         )
+
+    def _heard(self, text: str) -> None:
+        self.last_heard = time.monotonic()
+        self._say("Besuch", text)
+
+    def silent_for(self) -> float:
+        return time.monotonic() - self.last_heard
 
     def start(self) -> None:
         self.conv.start_session()
@@ -1333,9 +1347,18 @@ class Grabstein:
         self.talk.stop()
         self.state.add(datetime.now(), "talk_s", self.talk.elapsed())
         self.talk = None
+        # Hörbares Ende: sonst merkt niemand, dass Gustav wieder schläft
         if reason.startswith(("Zeitlimit", "Budget")):  # Gustav hat sich nicht selbst verabschiedet
+            group = "leave"
+        elif reason in ("keine Antwort mehr", "niemand mehr da"):
+            group = "silent"
+        elif reason == "von Hand beendet":
+            group = None
+        else:
+            group = "sleep"
+        if group:
             time.sleep(0.5)
-            self.player.play("leave")
+            self.player.play(group)
         self.next_talk = mono + s["cooldown_talk_s"]
         self.next_clip = mono + s["cooldown_clip_s"]
 
@@ -1410,7 +1433,8 @@ class Grabstein:
             if self.talk is not None:
                 talk, reason = self.talk, ""
                 if talk.ended.is_set():
-                    reason = "Gustav hat sich verabschiedet" if talk.wrap_since else "Agent hat aufgelegt"
+                    reason = ("Gustav hat sich verabschiedet" if talk.wrap_since else
+                              "keine Antwort mehr" if talk.silent_for() >= SILENCE_END_S - 1 else "Agent hat aufgelegt")
                 elif talk.wrap_since is not None and mono - talk.wrap_since > WRAP_GRACE_S:
                     reason = f"{talk.wrap_reason} (Verabschiedung zu lang)"
                 elif not talk.manual and sensors.gone(s["leave_s"]):
