@@ -288,7 +288,7 @@ VIEWS.start = {
     const sensor = (on, label, val) => `<div class="sensor ${on === null ? "na" : on ? "on" : ""}"><div class="lbl"><span class="led"></span>${label}</div><div class="val">${val}</div></div>`;
     live.className = "card";
     live.innerHTML = `
-      <div class="card-head"><h2>Live</h2><span class="muted">${st.cooldown.clip > 0 ? `Clip-Pause ${st.cooldown.clip} s` : "bereit"}</span></div>
+      <div class="card-head"><h2>Live</h2><span class="muted">${[st.cooldown.talk > 0 ? `Gesprächspause ${st.cooldown.talk} s` : "", st.cooldown.clip > 0 ? `Clip-Pause ${st.cooldown.clip} s` : ""].filter(Boolean).join(" · ") || "bereit"}</span></div>
       <div class="sensors">
         ${sensor(sen.pir, "Bewegung", sen.pir === null ? "nicht angeschlossen" : sen.pir ? "erkannt" : `zuletzt ${ago(sen.motion_ago)}`)}
         ${sensor(sen.radar, "Radar", sen.radar === null ? "nicht angeschlossen" : sen.radar ? `jemand da · ${Math.round(sen.radar_s)} s` : "frei")}
@@ -799,7 +799,7 @@ VIEWS.einstellungen = {
               ${fieldNumber("near_cm", "Gesprächsabstand", "Näher → Gustav redet. Weiter weg → er lockt.", "cm", s)}
               ${fieldNumber("leave_s", "Weg nach", "So lange frei = Gespräch endet.", "s", s)}
               ${fieldNumber("cooldown_clip_s", "Pause nach Clip", "Bis zum nächsten Vorbei-Clip.", "s", s)}
-              ${fieldNumber("cooldown_talk_s", "Pause nach Gespräch", "Bis zum nächsten Gespräch.", "s", s)}
+              ${fieldNumber("cooldown_talk_s", "Pause nach Gespräch", "Gilt, solange jemand davor bleibt. Ist das Radar frei, darf der Nächste gleich reden.", "s", s)}
             </div>
           </div>
           <div class="card">

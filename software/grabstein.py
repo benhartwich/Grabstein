@@ -1172,9 +1172,9 @@ def push_agent(prompt: str, first: str, talk_max_s: int) -> tuple[str, str]:
         },
         "tts": {"voice_id": CFG["voice_id"], "model_id": CFG["agent_model"]},
         "conversation": {"max_duration_seconds": talk_max_s + WRAP_GRACE_S + 15, "client_events": CLIENT_EVENTS},
-        # Wer dazwischenredet, unterbricht Gustav nicht – wird aber mitgeschrieben und in der nächsten Antwort berücksichtigt
+        # Dazwischenreden wird bewusst verworfen: sonst schreibt das Mikrofon Gustavs eigenes Echo als Besuch mit (getestet)
         "turn": {"silence_end_call_timeout": SILENCE_END_S, "turn_timeout": NUDGE_S,
-                 "transcribe_on_disabled_interruptions": True},
+                 "transcribe_on_disabled_interruptions": False},
     })
     privacy = AgentPlatformSettingsRequestModel.model_validate(
         {"privacy": {"record_voice": False, "retention_days": 1}})
@@ -1501,6 +1501,8 @@ class Grabstein:
             sensors.update()
             if sensors.gone(s["leave_s"]):
                 self.rewake = True
+                # Gesprächspause gilt nur für dieselben Besucher: sind alle weg, darf der Nächste gleich reden
+                self.next_talk = min(self.next_talk, mono)
             motion = sensors.motion()
             if motion:
                 self.state.add(now, "motion")
