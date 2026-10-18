@@ -351,3 +351,4 @@ dialog form { display: grid; gap: 12px; }
 .empty { color: var(--muted); font-size: .9rem; padding: 6px 0; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+.notice { margin: 12px 0 0; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid color-mix(in srgb, var(--full) 45%, transparent); background: color-mix(in srgb, var(--full) 12%, transparent); font-size: .88rem; line-height: 1.4; }

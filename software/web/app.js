@@ -5,6 +5,7 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const icon = (name) => `<svg><use href="#i-${name}"/></svg>`;
+const SPOTIFY_HINT = "Spotify findet das Gerät „Grabstein“ nicht. Nach jedem Neustart des Pi einmal in der Spotify-App unten aufs Gerätesymbol tippen und „Grabstein“ wählen – danach steuert die Web-App die Musik wieder selbst.";
 
 const MODE = {
   off: { label: "Schläft", short: "Aus" },
@@ -250,18 +251,19 @@ VIEWS.start = {
     $("#act-talk").disabled = !!st.talk || !st.agent || !st.online;
     $("#say-btn").disabled = !st.tts;
   },
-  distance(d) {
-    // Abstand auf einer Skala bis 6 m, darunter die Signalstärke von bewegtem und ruhendem Ziel
+  distance(d, nearCm) {
+    // Abstand auf einer Skala bis 6 m (Gesprächszone hervorgehoben), darunter die Signalstärke von bewegtem und ruhendem Ziel
     const pos = (cm) => Math.min(100, (cm / 600) * 100);
+    const m = (cm) => (cm / 100).toLocaleString("de-AT", { maximumFractionDigits: 1 });
     const who = d.state === 0 ? "niemand" : d.state === 1 ? "bewegt sich" : d.state === 2 ? "steht still" : "bewegt sich und steht";
-    const near = d.state && d.cm <= 150;
+    const near = d.state && d.cm <= nearCm;
     return `<div class="radar">
       <div class="radar-head"><span>Abstand</span><b>${d.state ? `${(d.cm / 100).toLocaleString("de-AT", { maximumFractionDigits: 1 })} m` : "–"}</b><span class="muted">${who}</span></div>
       <div class="radar-scale">
-        <i class="zone" style="width:${pos(150)}%"></i>
+        <i class="zone" style="width:${pos(nearCm)}%"></i>
         ${d.state ? `<i class="dot ${near ? "near" : ""}" style="left:${pos(d.cm)}%"></i>` : ""}
       </div>
-      <div class="radar-ticks"><span>0</span><span style="left:${pos(150)}%">1,5 m</span><span style="left:${pos(300)}%">3</span><span style="left:${pos(450)}%">4,5</span><span style="right:0">6 m</span></div>
+      <div class="radar-ticks"><span>0</span><span style="left:${pos(nearCm)}%">${m(nearCm)} m</span>${[300, 450].filter((x) => Math.abs(x - nearCm) > 60).map((x) => `<span style="left:${pos(x)}%">${m(x)}</span>`).join("")}<span style="right:0">6 m</span></div>
       <div class="energy"><span>Bewegung</span><div class="progress"><i style="width:${d.move_energy}%"></i></div><b>${d.move_energy}</b></div>
       <div class="energy"><span>Ruhend</span><div class="progress"><i style="width:${d.still_energy}%"></i></div><b>${d.still_energy}</b></div>
     </div>`;
@@ -288,7 +290,8 @@ VIEWS.start = {
         ${sensor(sen.pir, "Bewegung", sen.pir === null ? "nicht angeschlossen" : sen.pir ? "erkannt" : `zuletzt ${ago(sen.motion_ago)}`)}
         ${sensor(sen.radar, "Radar", sen.radar === null ? "nicht angeschlossen" : sen.radar ? `jemand da · ${Math.round(sen.radar_s)} s` : "frei")}
       </div>
-      ${sen.distance ? this.distance(sen.distance) : ""}
+      ${sen.distance ? this.distance(sen.distance, st.near_cm || 150) : ""}
+      ${st.music && st.music.on && st.music.source === "spotify" && st.music.spotify_missing ? `<p class="notice">${SPOTIFY_HINT}</p>` : ""}
       ${st.playing ? `<div class="nowplaying"><span class="eq"><i></i><i></i><i></i></span>Spielt: ${esc(st.playing)}</div>` : ""}`;
   },
 };
@@ -654,7 +657,7 @@ VIEWS.musik.spotify = async function () {
   const pl = sp.playlist;
   card.innerHTML = `
     <div class="card-head"><h2>Spotify</h2><span class="muted">${sp.device ? "Gerät „Grabstein“ bereit" : "Gerät nicht gefunden"}</span></div>
-    ${sp.device ? "" : `<p class="small muted">Einmal in der Spotify-App unten aufs Gerätesymbol tippen und „Grabstein“ wählen – danach findet der Grabstein sich selbst.</p>`}
+    ${sp.device ? "" : `<p class="notice">${SPOTIFY_HINT}</p>`}
     ${sp.error ? `<p class="small" style="color:var(--danger)">${esc(sp.error)}</p>` : ""}
     <div class="track"><div><div class="sub">Gewählte Playlist</div><div class="name">${pl ? esc(pl.name) : "– noch keine –"}</div>
       ${sp.track ? `<div class="sub">♪ ${esc(sp.track)}</div>` : ""}</div>
