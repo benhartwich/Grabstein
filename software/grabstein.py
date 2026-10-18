@@ -71,7 +71,8 @@ CFG = {
     "spotify_client_id": env("SPOTIFY_CLIENT_ID", ""),
 }
 GROUPS = ("approach", "lure", "stay", "wake", "leave", "sleep", "silent", "gentle")
-LURE_PAUSE_S = 20  # Abstand zwischen zwei Lockrufen, wenn jemand zu weit weg stehen bleibt
+LURE_PAUSE_S = 20
+REWAKE_S = 10  # nach Auflegen wegen Stille: wer stehen bleibt, weckt Gustav einmal so schnell wieder  # Abstand zwischen zwei Lockrufen, wenn jemand zu weit weg stehen bleibt
 MODES = ("off", "gentle", "full", "music")  # music = nur Hintergrundmusik, Sensoren ruhen
 LOG: deque[tuple[float, str]] = deque(maxlen=500)
 
@@ -1333,6 +1334,7 @@ class Grabstein:
         self.trusted = False
         self.net = False
         self.next_clip = self.next_talk = self.next_lure = 0.0
+        self.rewake = True  # einmal pro Besuch: nach Stille-Auflegen schnell wieder weckbar
         self.started = time.time()
         self._stop = threading.Event()
 
@@ -1409,6 +1411,7 @@ class Grabstein:
     def _end_talk(self, reason: str) -> None:
         s, mono = self.settings.get(), time.monotonic()
         log(f"Gesprächsende: {reason}")
+        manual = self.talk.manual
         self.talk.stop()
         self.state.add(datetime.now(), "talk_s", self.talk.elapsed())
         self.talk = None
@@ -1426,6 +1429,10 @@ class Grabstein:
             self.player.play(group)
         self.next_talk = mono + s["cooldown_talk_s"]
         self.next_clip = mono + s["cooldown_clip_s"]
+        if reason == "keine Antwort mehr" and self.rewake and not manual:
+            self.rewake = False  # bleibt jemand stehen, wacht Gustav gleich wieder auf (nicht endlos, z. B. bei Katzen)
+            self.next_talk = mono + REWAKE_S
+            log(f"Wieder weckbar in {REWAKE_S} s")
 
     # --- Hintergrund: Uhrzeit und Internet prüfen, ohne die Schleife aufzuhalten
     def _watch(self) -> None:
@@ -1490,6 +1497,8 @@ class Grabstein:
             else:
                 leds.show(Leds.OFF)
             sensors.update()
+            if sensors.gone(s["leave_s"]):
+                self.rewake = True
             motion = sensors.motion()
             if motion:
                 self.state.add(now, "motion")
