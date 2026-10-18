@@ -1172,7 +1172,9 @@ def push_agent(prompt: str, first: str, talk_max_s: int) -> tuple[str, str]:
         },
         "tts": {"voice_id": CFG["voice_id"], "model_id": CFG["agent_model"]},
         "conversation": {"max_duration_seconds": talk_max_s + WRAP_GRACE_S + 15, "client_events": CLIENT_EVENTS},
-        "turn": {"silence_end_call_timeout": SILENCE_END_S, "turn_timeout": NUDGE_S},
+        # Wer dazwischenredet, unterbricht Gustav nicht – wird aber mitgeschrieben und in der nächsten Antwort berücksichtigt
+        "turn": {"silence_end_call_timeout": SILENCE_END_S, "turn_timeout": NUDGE_S,
+                 "transcribe_on_disabled_interruptions": True},
     })
     privacy = AgentPlatformSettingsRequestModel.model_validate(
         {"privacy": {"record_voice": False, "retention_days": 1}})
