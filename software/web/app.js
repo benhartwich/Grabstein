@@ -20,7 +20,7 @@ const GROUP = {
   stay: { title: "Stehenbleiben", hint: "Statt eines Gesprächs, z. B. ohne Internet oder wenn das Budget leer ist." },
   wake: { title: "Aufwachen", hint: "Kurz vor jedem Gespräch – überbrückt den Verbindungsaufbau." },
   leave: { title: "Abschied", hint: "Wenn Gustav sich nach Zeitlimit oder leerem Budget nicht selbst verabschiedet hat." },
-  sleep: { title: "Einschlafen", hint: "Nach jedem Gespräch – damit man hört, dass Gustav wieder schläft." },
+  sleep: { title: "Einschlafen", hint: "Wenn ein Gespräch endet, weil die Aktivzeit vorbei ist." },
   silent: { title: "Keine Antwort", hint: "Wenn niemand mehr antwortet oder alle gegangen sind. Wer stehen bleibt, weckt Gustav nach 10 s noch einmal." },
   gentle: { title: "Lieb", hint: "Kinder-Modus – freundlich, nicht gruselig." },
 };

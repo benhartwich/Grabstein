@@ -1422,10 +1422,10 @@ class Grabstein:
             group = "leave"
         elif reason in ("keine Antwort mehr", "niemand mehr da"):
             group = "silent"
-        elif reason == "von Hand beendet":
-            group = None
-        else:
+        elif reason == "Ende der Aktivzeit":
             group = "sleep"
+        else:  # Gustav hat sich selbst verabschiedet (sagt dabei, dass er schlafen geht) oder von Hand beendet
+            group = None
         if group:
             time.sleep(0.5)
             self.player.play(group)
