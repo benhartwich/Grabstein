@@ -879,7 +879,8 @@ WRAP_UP = ("ZEIT UM: Antworte noch kurz auf das, was der Besuch gerade gesagt ha
 WRAP_GRACE_S = 30  # so lange darf die Verabschiedung dauern, dann wird hart beendet
 # Ohne "interruption": Gustav spricht jeden Satz zu Ende. Sonst hält er sein eigenes Echo
 # aus dem Lautsprecher für einen Zwischenruf und bricht ab.
-SILENCE_END_S = 15  # antwortet so lange niemand, legt Gustav auf (z. B. Katze statt Mensch, Kind schon weg)
+SILENCE_END_S = 25  # antwortet so lange niemand, legt Gustav auf (z. B. Katze statt Mensch, Kind schon weg)
+NUDGE_S = 8  # nach so viel Stille fragt Gustav von sich aus nach – Kinder überlegen oft länger
 CLIENT_EVENTS = ["audio", "agent_response", "user_transcript", "agent_response_correction", "agent_tool_response"]
 
 
@@ -942,6 +943,7 @@ class Talk:
                             audio = inner.out.get(timeout=0.02)
                         except queue.Empty:
                             audio = inner.SILENCE  # aplay blockiert bei vollem Puffer – das gibt den Takt
+                        real = audio is not inner.SILENCE
                         try:
                             # in 20-ms-Stücken schreiben: aplay gibt den Takt vor, der Pegel läuft mit
                             for i in range(0, len(audio), len(inner.SILENCE)):
@@ -949,6 +951,8 @@ class Talk:
                                 inner.play.stdin.write(piece)
                                 inner.play.stdin.flush()
                                 inner.level = max(_rms(piece) / 4000, inner.level * 0.75)
+                                if real:
+                                    talk.last_voice = time.monotonic()
                         except (OSError, ValueError):
                             break
 
@@ -997,11 +1001,12 @@ class Talk:
         self.wrap_reason = ""
         self.audio = PipeAudio()
         self.started = talk_started = time.monotonic()
+        talk = self  # für PipeAudio: wann Gustav zuletzt hörbar gesprochen hat
         key = CFG["api_key"] or None
         client = link.client() if link else ElevenLabs(api_key=key)
         say = on_text or (lambda who, text: None)
         self._say = say
-        self.last_heard = self.started
+        self.last_heard = self.last_voice = self.started
         self.conv = Conversation(
             client,
             CFG["agent_id"],
@@ -1021,7 +1026,8 @@ class Talk:
         self._say("Besuch", text)
 
     def silent_for(self) -> float:
-        return time.monotonic() - self.last_heard
+        """Sekunden, seit zuletzt jemand gesprochen hat – Gustav oder Besuch."""
+        return time.monotonic() - max(self.last_heard, self.last_voice)
 
     def start(self) -> None:
         self.conv.start_session()
@@ -1165,7 +1171,7 @@ def push_agent(prompt: str, first: str, talk_max_s: int) -> tuple[str, str]:
         },
         "tts": {"voice_id": CFG["voice_id"], "model_id": CFG["agent_model"]},
         "conversation": {"max_duration_seconds": talk_max_s + WRAP_GRACE_S + 15, "client_events": CLIENT_EVENTS},
-        "turn": {"silence_end_call_timeout": SILENCE_END_S},
+        "turn": {"silence_end_call_timeout": SILENCE_END_S, "turn_timeout": NUDGE_S},
     })
     privacy = AgentPlatformSettingsRequestModel.model_validate(
         {"privacy": {"record_voice": False, "retention_days": 1}})
@@ -1493,7 +1499,7 @@ class Grabstein:
                 talk, reason = self.talk, ""
                 if talk.ended.is_set():
                     reason = ("Gustav hat sich verabschiedet" if talk.wrap_since else
-                              "keine Antwort mehr" if talk.silent_for() >= SILENCE_END_S - 1 else "Agent hat aufgelegt")
+                              "keine Antwort mehr" if talk.silent_for() >= SILENCE_END_S - 2 else "Agent hat aufgelegt")
                 elif talk.wrap_since is not None and mono - talk.wrap_since > WRAP_GRACE_S:
                     reason = f"{talk.wrap_reason} (Verabschiedung zu lang)"
                 elif not talk.manual and sensors.gone(s["leave_s"]):
