@@ -488,10 +488,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_file(self, f: Path) -> None:
         data = f.read_bytes()
+        if f.name == "index.html":
+            # Versionsnummer an CSS/JS hängen: Handys (v. a. vom Startbildschirm) halten sonst alte Stände fest
+            for name in ("style.css", "app.js"):
+                v = int((STATIC / name).stat().st_mtime)
+                data = data.replace(f'"{name}"'.encode(), f'"{name}?v={v}"'.encode())
         self.send_response(200)
         self.send_header("Content-Type", TYPES.get(f.suffix.lower(), "application/octet-stream"))
         self.send_header("Content-Length", str(len(data)))
-        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Cache-Control", "no-store" if f.name == "index.html" else "no-cache")
         self.end_headers()
         self.wfile.write(data)
 
