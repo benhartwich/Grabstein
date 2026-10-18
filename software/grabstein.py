@@ -70,7 +70,7 @@ CFG = {
     "web_pin": env("WEB_PIN", ""),
     "spotify_client_id": env("SPOTIFY_CLIENT_ID", ""),
 }
-GROUPS = ("approach", "lure", "stay", "leave", "sleep", "silent", "gentle")
+GROUPS = ("approach", "lure", "stay", "wake", "leave", "sleep", "silent", "gentle")
 LURE_PAUSE_S = 20  # Abstand zwischen zwei Lockrufen, wenn jemand zu weit weg stehen bleibt
 MODES = ("off", "gentle", "full", "music")  # music = nur Hintergrundmusik, Sensoren ruhen
 LOG: deque[tuple[float, str]] = deque(maxlen=500)
@@ -886,7 +886,8 @@ CLIENT_EVENTS = ["audio", "agent_response", "user_transcript", "agent_response_c
 class Talk:
     """Ein Gespräch mit dem ElevenLabs-Agenten über Mikrofon und Lautsprecher des ReSpeaker."""
 
-    def __init__(self, mode: str, on_text=None, codeword: str = "Kürbiskern") -> None:
+    def __init__(self, mode: str, on_text=None, codeword: str = "Kürbiskern", link: "AgentLink | None" = None,
+                 hold=None) -> None:
         from elevenlabs.client import ElevenLabs
         from elevenlabs.conversational_ai.conversation import (AudioInterface, Conversation,
                                                                ConversationInitiationData)
@@ -936,6 +937,8 @@ class Talk:
                 def write() -> None:
                     while not inner.stopped.is_set():
                         try:
+                            if hold and hold():  # Aufwach-Clip läuft noch: Gustav wartet, bis er fertig ist
+                                raise queue.Empty
                             audio = inner.out.get(timeout=0.02)
                         except queue.Empty:
                             audio = inner.SILENCE  # aplay blockiert bei vollem Puffer – das gibt den Takt
@@ -995,7 +998,7 @@ class Talk:
         self.audio = PipeAudio()
         self.started = talk_started = time.monotonic()
         key = CFG["api_key"] or None
-        client = ElevenLabs(api_key=key)
+        client = link.client() if link else ElevenLabs(api_key=key)
         say = on_text or (lambda who, text: None)
         self._say = say
         self.last_heard = self.started
@@ -1009,6 +1012,9 @@ class Talk:
             callback_user_transcript=self._heard,
             callback_end_session=self.ended.set,
         )
+        url = link.take() if link and key else None
+        if url:  # vorab geholte Adresse: spart den Abruf beim Start
+            self.conv._get_signed_url = lambda: url
 
     def _heard(self, text: str) -> None:
         self.last_heard = time.monotonic()
@@ -1061,6 +1067,55 @@ def _warm_up() -> None:
         log(f"ElevenLabs-SDK geladen ({time.monotonic() - t:.1f} s)")
     except Exception as e:  # noqa: BLE001
         log(f"SDK-Vorladen fehlgeschlagen: {e}")
+
+
+class AgentLink:
+    """Hält einen ElevenLabs-Client und eine frische signierte Gesprächsadresse bereit.
+    Beim Gesprächsstart fällt so der Abruf weg (0,2 s, mit kalter Verbindung bis 0,8 s)."""
+    MAX_AGE_S = 600  # ElevenLabs lässt signierte Adressen 15 min gelten
+
+    def __init__(self) -> None:
+        self._client = None
+        self._url: str | None = None
+        self._at = 0.0
+        self._lock = threading.Lock()
+        self._wake = threading.Event()
+        if CFG["api_key"] and CFG["agent_id"]:
+            threading.Thread(target=self._loop, daemon=True, name="agent-link").start()
+
+    def client(self):
+        from elevenlabs.client import ElevenLabs
+        if self._client is None:
+            self._client = ElevenLabs(api_key=CFG["api_key"] or None)
+        return self._client
+
+    def take(self) -> str | None:
+        """Adresse abgeben (gilt nur für ein Gespräch); danach sofort eine neue holen."""
+        with self._lock:
+            url = self._url if time.monotonic() - self._at < self.MAX_AGE_S else None
+            self._url = None
+        self._wake.set()
+        return url
+
+    def _fetch(self) -> str:
+        from types import SimpleNamespace
+        from elevenlabs.conversational_ai.conversation import Conversation
+        # dieselbe Adresse, die das SDK beim Start selbst holen würde (inkl. source/version)
+        stub = SimpleNamespace(client=self.client(), agent_id=CFG["agent_id"], environment=None)
+        return Conversation._get_signed_url(stub)
+
+    def _loop(self) -> None:
+        while True:
+            try:
+                url = self._fetch()
+                with self._lock:
+                    self._url, self._at = url, time.monotonic()
+                wait = self.MAX_AGE_S - 60
+            except Exception as e:  # noqa: BLE001 – ohne Vorrat holt das SDK die Adresse selbst
+                log(f"Gesprächsadresse nicht vorab geholt: {str(e)[:80]}")
+                wait = 60
+            self._wake.wait(wait)
+            self._wake.clear()
 
 
 class Gustav:
@@ -1257,6 +1312,7 @@ class Grabstein:
         self.clips = Clips(CFG["clips_dir"], data / "clips.json")
         self.gustav = Gustav(data / "gustav.json")
         self.player = ClipPlayer(self.clips)
+        self.link = AgentLink()
         self.library = MusicLibrary(CFG["clips_dir"].parent / "musik")
         self.spotify = None
         if CFG["spotify_client_id"]:
@@ -1331,7 +1387,10 @@ class Grabstein:
     def _start_talk(self, mode: str, manual: bool = False) -> bool:
         try:
             self.transcript.clear()
-            self.talk = Talk(mode, self.on_text, self.settings.get()["codeword"])
+            # Aufwach-Clip überbrückt den Verbindungsaufbau; Gustavs erste Worte warten, bis er fertig ist
+            woke = not self.player.playing() and self.player.play("wake")
+            self.talk = Talk(mode, self.on_text, self.settings.get()["codeword"], self.link,
+                             hold=self.player.playing if woke else None)
             self.talk.manual = manual
             self.talk.start()
             self.state.add(datetime.now(), "talks")

@@ -23,6 +23,14 @@
     "Wenn du dreimal leise Buh flüsterst, darfst du dir ein Zuckerl nehmen. Ich hab's nicht gesehen …",
     "Früher war hier ein Garten. Jetzt bin ich hier. Und die Spinne. Sag Hallo zur Spinne."
   ],
+  "wake": [
+    "Hm? … Wer weckt mich da?",
+    "[yawns] Huch … Besuch?",
+    "Was … wer ist da? …",
+    "Mmmh … ich hab so schön geschlafen …",
+    "[gasps] Oh! … Jemand ist da …",
+    "Huaaah … [yawns] Wie spät ist es denn?"
+  ],
   "leave": [
     "Ich muss zurück in mein Grab … die Spinne wartet. Fröhliches Halloween!",
     "Huuuh … ich werde müde. Komm wieder … nächstes Jahr …",

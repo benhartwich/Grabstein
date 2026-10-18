@@ -18,6 +18,7 @@ const GROUP = {
   approach: { title: "Vorbeigehen", hint: "Kurz – wenn der Bewegungsmelder jemanden sieht." },
   lure: { title: "Anlocken", hint: "Wenn jemand stehen bleibt, aber weiter weg ist als der Gesprächsabstand." },
   stay: { title: "Stehenbleiben", hint: "Statt eines Gesprächs, z. B. ohne Internet oder wenn das Budget leer ist." },
+  wake: { title: "Aufwachen", hint: "Kurz vor jedem Gespräch – überbrückt den Verbindungsaufbau." },
   leave: { title: "Abschied", hint: "Wenn Gustav sich nach Zeitlimit oder leerem Budget nicht selbst verabschiedet hat." },
   sleep: { title: "Einschlafen", hint: "Nach jedem Gespräch – damit man hört, dass Gustav wieder schläft." },
   silent: { title: "Keine Antwort", hint: "Wenn niemand mehr antwortet oder alle gegangen sind." },
