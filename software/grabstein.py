@@ -882,6 +882,8 @@ WRAP_GRACE_S = 30  # so lange darf die Verabschiedung dauern, dann wird hart bee
 # aus dem Lautsprecher für einen Zwischenruf und bricht ab.
 SILENCE_END_S = 25  # antwortet so lange niemand, legt Gustav auf (z. B. Katze statt Mensch, Kind schon weg)
 NUDGE_S = 8  # nach so viel Stille fragt Gustav von sich aus nach – Kinder überlegen oft länger
+RIDDLES = 12  # so viele Rätsel stehen im Prompt; Gustav bekommt pro Gespräch eine zufällige Nummer
+FIRST_FALLBACK = "Psst … du da! Als was bist du denn verkleidet?"
 CLIENT_EVENTS = ["audio", "agent_response", "user_transcript", "agent_response_correction", "agent_tool_response"]
 
 
@@ -889,7 +891,7 @@ class Talk:
     """Ein Gespräch mit dem ElevenLabs-Agenten über Mikrofon und Lautsprecher des ReSpeaker."""
 
     def __init__(self, mode: str, on_text=None, codeword: str = "Kürbiskern", link: "AgentLink | None" = None,
-                 hold=None) -> None:
+                 hold=None, greeting: str = "") -> None:
         from elevenlabs.client import ElevenLabs
         from elevenlabs.conversational_ai.conversation import (AudioInterface, Conversation,
                                                                ConversationInitiationData)
@@ -900,7 +902,7 @@ class Talk:
 
             Beim ReSpeaker liefert das Mikrofon nur, solange die Wiedergabe läuft – deshalb
             bekommt aplay Stille, wenn Gustav gerade nichts sagt."""
-            CHUNK = 4000 * 2  # 250 ms bei 16 kHz, 16 bit mono
+            CHUNK = 1600 * 2  # 100 ms bei 16 kHz, 16 bit mono – kleinere Stücke: Gustav hört das Satzende früher
             SILENCE = bytes(640)  # 20 ms
             FMT = ["-q", "-t", "raw", "-f", "S16_LE", "-r", "16000", "-c", "1"]
 
@@ -975,10 +977,13 @@ class Talk:
 
             def stop(inner) -> None:  # noqa: N805
                 if inner.drain and inner.procs:
-                    end = time.monotonic() + 8  # Verabschiedung noch ausspielen
-                    while not inner.out.empty() and time.monotonic() < end:
+                    # Verabschiedung ausspielen: ElevenLabs legt auf, sobald das Audio *gesendet* ist –
+                    # leere Schlange heißt nicht fertig, das letzte Stück läuft dann noch
+                    end = time.monotonic() + 15
+                    while ((not inner.out.empty() or time.monotonic() - talk.last_voice < 0.3)
+                           and time.monotonic() < end):
                         time.sleep(0.05)
-                    time.sleep(0.4)  # Rest im aplay-Puffer
+                    time.sleep(0.3)  # Rest im aplay-Puffer
                 with inner.lock:
                     if inner.stopped.is_set():
                         return
@@ -1013,7 +1018,9 @@ class Talk:
             CFG["agent_id"],
             requires_auth=bool(key),
             audio_interface=self.audio,
-            config=ConversationInitiationData(dynamic_variables={"modus": mode, "codewort": codeword}),
+            config=ConversationInitiationData(dynamic_variables={
+                "modus": mode, "codewort": codeword, "begruessung": greeting or FIRST_FALLBACK,
+                "raetsel_nr": str(random.randint(1, RIDDLES))}),
             callback_agent_response=lambda t: say("Gustav", t),
             callback_user_transcript=self._heard,
             callback_end_session=self.ended.set,
@@ -1140,8 +1147,15 @@ class Gustav:
     def _from_markdown() -> tuple[str, str]:
         text = (HERE / "agent_prompt.md").read_text()
         prompt = text.split("```", 2)[1].strip()
-        first = next(line.split(">", 1)[1].strip() for line in text.splitlines() if line.strip().startswith(">"))
+        first = "\n".join(line.split(">", 1)[1].strip() for line in text.splitlines() if line.strip().startswith(">"))
         return prompt, first
+
+    def greetings(self) -> list[str]:
+        """Erste Nachricht: eine Variante pro Zeile."""
+        return [ln.strip() for ln in self.data["first_message"].splitlines() if ln.strip()] or [FIRST_FALLBACK]
+
+    def greeting(self) -> str:
+        return random.choice(self.greetings())
 
     def save(self, prompt: str, first: str, pushed: bool = False) -> None:
         prompt, first = prompt.strip(), first.strip()
@@ -1159,13 +1173,16 @@ def push_agent(prompt: str, first: str, talk_max_s: int) -> tuple[str, str]:
     from elevenlabs.types import AgentPlatformSettingsRequestModel, ConversationalConfig
     if not CFG["api_key"] or not CFG["voice_id"]:
         raise ValueError("Erst ELEVENLABS_API_KEY und ELEVENLABS_VOICE_ID in /etc/grabstein/grabstein.env eintragen")
+    variants = [ln.strip() for ln in first.splitlines() if ln.strip()] or [FIRST_FALLBACK]
     cfg = ConversationalConfig.model_validate({
         "agent": {
-            "first_message": first,
+            "first_message": "{{begruessung}}",  # Variante sucht das Programm pro Gespräch zufällig aus
             "language": "de",
-            "dynamic_variables": {"dynamic_variable_placeholders": {"modus": "full", "codewort": "Kürbiskern"}},
+            "dynamic_variables": {"dynamic_variable_placeholders": {
+                "modus": "full", "codewort": "Kürbiskern", "begruessung": variants[0], "raetsel_nr": "1"}},
             "prompt": {
                 "prompt": prompt,
+                "temperature": 0.8,  # bei 0 sagt Gustav jedem Besuch fast wörtlich dasselbe
                 "built_in_tools": {"end_call": {"type": "system", "name": "end_call", "description": "",
                                                 "params": {"system_tool_type": "end_call"}}},
             },
@@ -1173,7 +1190,7 @@ def push_agent(prompt: str, first: str, talk_max_s: int) -> tuple[str, str]:
         "tts": {"voice_id": CFG["voice_id"], "model_id": CFG["agent_model"]},
         "conversation": {"max_duration_seconds": talk_max_s + WRAP_GRACE_S + 15, "client_events": CLIENT_EVENTS},
         # Dazwischenreden wird bewusst verworfen: sonst schreibt das Mikrofon Gustavs eigenes Echo als Besuch mit (getestet)
-        "turn": {"silence_end_call_timeout": SILENCE_END_S, "turn_timeout": NUDGE_S,
+        "turn": {"silence_end_call_timeout": SILENCE_END_S, "turn_timeout": NUDGE_S, "speculative_turn": True,
                  "transcribe_on_disabled_interruptions": False},
     })
     privacy = AgentPlatformSettingsRequestModel.model_validate(
@@ -1400,7 +1417,7 @@ class Grabstein:
             # Aufwach-Clip überbrückt den Verbindungsaufbau; Gustavs erste Worte warten, bis er fertig ist
             woke = not self.player.playing() and self.player.play("wake")
             self.talk = Talk(mode, self.on_text, self.settings.get()["codeword"], self.link,
-                             hold=self.player.playing if woke else None)
+                             hold=self.player.playing if woke else None, greeting=self.gustav.greeting())
             self.talk.manual = manual
             self.talk.start()
             self.state.add(datetime.now(), "talks")
@@ -1617,7 +1634,8 @@ def cmd_reden() -> None:
     s = Settings(CFG["data_dir"] / "settings.json").get()
     set_volume(s["volume"])
     _warm_up()
-    t = Talk("full", lambda who, text: log(f"{who}: {text}") if s["transcripts"] else None, s["codeword"])
+    t = Talk("full", lambda who, text: log(f"{who}: {text}") if s["transcripts"] else None, s["codeword"],
+             greeting=Gustav(CFG["data_dir"] / "gustav.json").greeting())
     t.start()
     print(f"Gespräch läuft höchstens {s['talk_max_s']} s (Strg+C beendet) …")
     try:

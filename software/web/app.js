@@ -727,7 +727,7 @@ VIEWS.gustav = {
         </div>
         <div class="card">
           <h2>Persönlichkeit</h2>
-          <label class="small muted" for="g-first">Erste Nachricht</label>
+          <label class="small muted" for="g-first">Erste Nachricht – eine Variante pro Zeile, Gustav nimmt jedes Mal zufällig eine</label>
           <textarea id="g-first" rows="4" maxlength="1000">${esc(g.first_message)}</textarea>
           <label class="small muted" for="g-prompt">Systemprompt</label>
           <textarea id="g-prompt" class="code" maxlength="20000">${esc(g.prompt)}</textarea>
