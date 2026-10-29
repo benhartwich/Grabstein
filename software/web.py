@@ -362,7 +362,8 @@ def gustav_put(h, app):
             raise ApiError(f"Neuer Agent {agent_id} angelegt – bitte als ELEVENLABS_AGENT_ID eintragen")
         g.log("Gustav bei ElevenLabs aktualisiert")
     try:
-        app.gustav.save(prompt, first, pushed=bool(body.get("push")))
+        reply = body.get("reply_message")
+        app.gustav.save(prompt, first, pushed=bool(body.get("push")), reply=None if reply is None else str(reply))
     except ValueError as e:
         raise ApiError(str(e)) from None
     return {**app.gustav.data, "hint": hint}

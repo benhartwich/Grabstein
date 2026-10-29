@@ -729,6 +729,8 @@ VIEWS.gustav = {
           <h2>Persönlichkeit</h2>
           <label class="small muted" for="g-first">Erste Nachricht – eine Variante pro Zeile, Gustav nimmt jedes Mal zufällig eine</label>
           <textarea id="g-first" rows="4" maxlength="1000">${esc(g.first_message)}</textarea>
+          <label class="small muted" for="g-reply">Kurze Begrüßung nach Zuruf – wenn jemand auf einen Vorbeigeh- oder Lockruf-Clip stehen bleibt (ohne Aufwach-Clip, eine Variante pro Zeile)</label>
+          <textarea id="g-reply" rows="3" maxlength="1000">${esc(g.reply_message || "")}</textarea>
           <label class="small muted" for="g-prompt">Systemprompt</label>
           <textarea id="g-prompt" class="code" maxlength="20000">${esc(g.prompt)}</textarea>
           <p class="small muted">{{modus}} ist „gentle“ oder „full“. Änderungen wirken erst nach „Zu ElevenLabs übertragen“.</p>
@@ -740,7 +742,7 @@ VIEWS.gustav = {
       </div>`;
     bindFields($("#view-gustav"));
     const save = async (push) => {
-      const body = { prompt: $("#g-prompt").value, first_message: $("#g-first").value, push };
+      const body = { prompt: $("#g-prompt").value, first_message: $("#g-first").value, reply_message: $("#g-reply").value, push };
       const r = await run(() => api("PUT", "/api/gustav", body), push ? "Gustav ist aktualisiert" : "Gespeichert");
       if (r) { S.gustav = { ...S.gustav, ...r }; if (r.hint) toast(r.hint); }
     };

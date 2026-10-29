@@ -884,6 +884,16 @@ SILENCE_END_S = 25  # antwortet so lange niemand, legt Gustav auf (z. B. Katze s
 NUDGE_S = 8  # nach so viel Stille fragt Gustav von sich aus nach – Kinder überlegen oft länger
 RIDDLES = 12  # so viele Rätsel stehen im Prompt; Gustav bekommt pro Gespräch eine zufällige Nummer
 FIRST_FALLBACK = "Psst … du da! Als was bist du denn verkleidet?"
+# Nach einem Zuruf (Vorbeigeh-/Lockruf-Clip) antworten die Leute oft sofort – das hört noch niemand.
+# Bleibt dann jemand kurz stehen, startet Gustav ohne Aufwach-Clip und bittet ums Wiederholen.
+CALLED_WINDOW_S = 20
+CALLED_STAY_S = 2
+REPLY_DEFAULT = "\n".join([
+    "Hm? Hast du was gesagt? Sag's nochmal, ich hör so schlecht.",
+    "Ja … ich hör dich! Was hast du gesagt?",
+    "Wie bitte? Ich hab Erde in den Ohren … nochmal!",
+    "Oh, du redest mit mir? Sag's nochmal, ganz laut!",
+])
 CLIENT_EVENTS = ["audio", "agent_response", "user_transcript", "agent_response_correction", "agent_tool_response"]
 
 
@@ -1141,7 +1151,8 @@ class Gustav:
             self.data = json.loads(path.read_text())
         except (OSError, ValueError):
             prompt, first = self._from_markdown()
-            self.data = {"prompt": prompt, "first_message": first, "pushed": None}
+            self.data = {"prompt": prompt, "first_message": first, "reply_message": REPLY_DEFAULT, "pushed": None}
+        self.data.setdefault("reply_message", REPLY_DEFAULT)
 
     @staticmethod
     def _from_markdown() -> tuple[str, str]:
@@ -1157,11 +1168,17 @@ class Gustav:
     def greeting(self) -> str:
         return random.choice(self.greetings())
 
-    def save(self, prompt: str, first: str, pushed: bool = False) -> None:
+    def reply(self) -> str:
+        """Kurze Begrüßung nach einem Zuruf: der Besuch hat vermutlich schon geantwortet."""
+        lines = [ln.strip() for ln in self.data.get("reply_message", REPLY_DEFAULT).splitlines() if ln.strip()]
+        return random.choice(lines or REPLY_DEFAULT.splitlines())
+
+    def save(self, prompt: str, first: str, pushed: bool = False, reply: str | None = None) -> None:
         prompt, first = prompt.strip(), first.strip()
         if not prompt or not first:
             raise ValueError("Prompt und erste Nachricht dürfen nicht leer sein")
-        self.data = {"prompt": prompt[:20000], "first_message": first[:1000],
+        reply = (reply if reply is not None else self.data.get("reply_message", REPLY_DEFAULT)).strip()
+        self.data = {"prompt": prompt[:20000], "first_message": first[:1000], "reply_message": reply[:1000],
                      "pushed": time.time() if pushed else self.data.get("pushed")}
         self.path.parent.mkdir(parents=True, exist_ok=True)
         write_atomic(self.path, json.dumps(self.data, ensure_ascii=False, indent=1))
@@ -1353,6 +1370,7 @@ class Grabstein:
         self.trusted = False
         self.net = False
         self.next_clip = self.next_talk = self.next_lure = 0.0
+        self.called = -CALLED_WINDOW_S  # wann zuletzt ein Clip jemanden angesprochen hat
         self.rewake = True  # einmal pro Besuch: nach Stille-Auflegen schnell wieder weckbar
         self.started = time.time()
         self._stop = threading.Event()
@@ -1411,13 +1429,15 @@ class Grabstein:
             self._end_talk("von Hand beendet")
         return True, "Gestoppt"
 
-    def _start_talk(self, mode: str, manual: bool = False) -> bool:
+    def _start_talk(self, mode: str, manual: bool = False, called: bool = False) -> bool:
         try:
             self.transcript.clear()
-            # Aufwach-Clip überbrückt den Verbindungsaufbau; Gustavs erste Worte warten, bis er fertig ist
-            woke = not self.player.playing() and self.player.play("wake")
+            # Aufwach-Clip überbrückt den Verbindungsaufbau; Gustavs erste Worte warten, bis er fertig ist.
+            # Nach einem Zuruf nicht: da wartet der Besuch schon auf Antwort.
+            woke = not called and not self.player.playing() and self.player.play("wake")
             self.talk = Talk(mode, self.on_text, self.settings.get()["codeword"], self.link,
-                             hold=self.player.playing if woke else None, greeting=self.gustav.greeting())
+                             hold=self.player.playing if woke else None,
+                             greeting=self.gustav.reply() if called else self.gustav.greeting())
             self.talk.manual = manual
             self.talk.start()
             self.state.add(datetime.now(), "talks")
@@ -1553,15 +1573,18 @@ class Grabstein:
                 if mono >= self.next_lure:
                     if self.player.play("lure"):
                         self.state.add(now, "clips")
+                        self.called = mono
                     self.next_lure = mono + LURE_PAUSE_S
                 continue
 
-            # --- jemand bleibt nah genug stehen
-            if sensors.stayed(s["stay_s"]) and mono >= self.next_talk:
+            # --- jemand bleibt nah genug stehen (nach einem Zuruf genügt kürzeres Stehenbleiben)
+            called = mono - self.called < CALLED_WINDOW_S
+            if sensors.stayed(CALLED_STAY_S if called else s["stay_s"]) and mono >= self.next_talk:
                 self.state.add(now, "stays")
                 can_talk = (s["live_agent"] and CFG["agent_id"] and (mode == "full" or s["talk_gentle"])
                             and self.state.left(now, s["talk_budget_min"]) > 15)
-                if can_talk and self.net and self._start_talk(mode):
+                if can_talk and self.net and self._start_talk(mode, called=called):
+                    self.called = -CALLED_WINDOW_S
                     continue
                 if self.player.play("gentle" if mode == "gentle" else "stay"):
                     self.state.add(now, "clips")
@@ -1573,6 +1596,7 @@ class Grabstein:
             if motion and s["approach_clips"] and mono >= self.next_clip:
                 if self.player.play("gentle" if mode == "gentle" else "approach"):
                     self.state.add(now, "clips")
+                    self.called = mono
                 self.next_clip = mono + s["cooldown_clip_s"]
 
         if self.talk is not None:
