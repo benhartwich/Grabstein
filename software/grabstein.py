@@ -19,6 +19,7 @@ Befehle:
 """
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import queue
@@ -934,6 +935,12 @@ class Talk:
             def _spawn(inner, input_callback) -> None:  # noqa: N805
                 inner.play = subprocess.Popen(["aplay", *inner.FMT, "--buffer-time=100000"],
                                               stdin=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                # Pipe auf eine Seite verkleinern: sonst puffert sie 64 KB = 2 s Ton. Dann hört man Gustav
+                # 2 s verspätet, und beim Auflegen gingen genau diese 2 s (die letzten Worte) verloren.
+                try:
+                    fcntl.fcntl(inner.play.stdin.fileno(), fcntl.F_SETPIPE_SZ, 4096)
+                except OSError as e:
+                    log(f"Pipe-Puffer nicht verkleinert: {e}")
                 inner.rec = subprocess.Popen(["arecord", *inner.FMT], stdout=subprocess.PIPE,
                                              stderr=subprocess.DEVNULL)
                 inner.procs = [inner.play, inner.rec]
@@ -993,7 +1000,7 @@ class Talk:
                     while ((not inner.out.empty() or time.monotonic() - talk.last_voice < 0.3)
                            and time.monotonic() < end):
                         time.sleep(0.05)
-                    time.sleep(0.3)  # Rest im aplay-Puffer
+                    time.sleep(0.6)  # Rest in Pipe (128 ms), aplay (100 ms) und Mischer (200 ms)
                 with inner.lock:
                     if inner.stopped.is_set():
                         return
