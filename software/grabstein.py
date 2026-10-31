@@ -888,6 +888,10 @@ FIRST_FALLBACK = "Psst … du da! Als was bist du denn verkleidet?"
 # Nach einem Zuruf (Vorbeigeh-/Lockruf-Clip) antworten die Leute oft sofort – das hört noch niemand.
 # Bleibt dann jemand kurz stehen, startet Gustav ohne Aufwach-Clip und bittet ums Wiederholen.
 CALLED_WINDOW_S = 20
+# Das Radar verliert stillstehende Leute zwischendurch. Im Gespräch zählt deshalb auch, ob der Besuch
+# redet, und als neuer Besuch gilt erst, wer nach längerer Radar-Pause kommt.
+TALK_GONE_QUIET_S = 12
+NEW_VISIT_S = 30
 CALLED_STAY_S = 2
 REPLY_DEFAULT = "\n".join([
     "Hm? Hast du was gesagt? Sag's nochmal, ich hör so schlecht.",
@@ -1464,11 +1468,11 @@ class Grabstein:
         # Hörbares Ende: sonst merkt niemand, dass Gustav wieder schläft
         if reason.startswith(("Zeitlimit", "Budget")):  # Gustav hat sich nicht selbst verabschiedet
             group = "leave"
-        elif reason in ("keine Antwort mehr", "niemand mehr da"):
+        elif reason == "keine Antwort mehr":
             group = "silent"
         elif reason == "Ende der Aktivzeit":
             group = "sleep"
-        else:  # Gustav hat sich selbst verabschiedet (sagt dabei, dass er schlafen geht) oder von Hand beendet
+        else:  # selbst verabschiedet (sagt dabei, dass er schlafen geht), von Hand beendet oder niemand mehr da
             group = None
         if group:
             time.sleep(0.5)
@@ -1543,7 +1547,7 @@ class Grabstein:
             else:
                 leds.show(Leds.OFF)
             sensors.update()
-            if sensors.gone(s["leave_s"]):
+            if sensors.gone(max(s["leave_s"], NEW_VISIT_S)):
                 self.rewake = True
                 # Gesprächspause gilt nur für dieselben Besucher: sind alle weg, darf der Nächste gleich reden
                 self.next_talk = min(self.next_talk, mono)
@@ -1559,7 +1563,8 @@ class Grabstein:
                               "keine Antwort mehr" if talk.silent_for() >= SILENCE_END_S - 2 else "Agent hat aufgelegt")
                 elif talk.wrap_since is not None and mono - talk.wrap_since > WRAP_GRACE_S:
                     reason = f"{talk.wrap_reason} (Verabschiedung zu lang)"
-                elif not talk.manual and sensors.gone(s["leave_s"]):
+                elif (not talk.manual and sensors.gone(s["leave_s"])
+                      and time.monotonic() - talk.last_heard >= TALK_GONE_QUIET_S):
                     reason = "niemand mehr da"
                 elif talk.elapsed() > s["talk_max_s"]:
                     talk.wrap_up("Zeitlimit")
